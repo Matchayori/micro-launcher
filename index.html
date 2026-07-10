@@ -862,6 +862,7 @@
   <div class="card" id="ambientPanel">
     <h2>🎧 环境音 Ambient sound</h2>
     <div class="hint">找点声音陪着你，帮自己更容易进入状态。所有声音都在浏览器里实时生成，不需要联网下载。<br>Some sound to ease you into the task — generated live in the browser, no downloads needed.</div>
+    <div class="hint" id="ambientBrowserHint" style="display:none;">⚠️ 在 Safari 上环境音可能播放不出声音，建议使用 Chrome。<br>Ambient sound may not play in Safari — Chrome is recommended.</div>
 
     <div class="presets" id="ambientSounds"></div>
 
@@ -1796,6 +1797,16 @@
   }
 
   Ambient.onChange(updateAmbientUI);
+
+  // Safari (desktop and iOS) has been unreliable at actually producing
+  // audible Web Audio API output for this app even when AudioContext
+  // reports state "running" with no errors — Chrome does not have this
+  // problem. Flag it for Safari users instead of chasing it further.
+  (function warnIfSafari() {
+    const ua = navigator.userAgent;
+    const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(ua);
+    if (isSafari) $("ambientBrowserHint").style.display = "block";
+  })();
 
   $("ambientToggle").addEventListener("click", () => {
     const panel = $("ambientPanel");
