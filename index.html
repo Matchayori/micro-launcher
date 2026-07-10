@@ -1860,6 +1860,11 @@
   const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
   const VOICE_SUPPORTED = !!SpeechRecognitionCtor;
 
+  // Chinese SpeechRecognition results come back with no punctuation at all —
+  // run the raw transcript through Claude with a narrow, non-coaching system
+  // prompt whose only job is to add punctuation, verbatim otherwise.
+  const PUNCTUATION_SYSTEM_PROMPT = "你是一个中文标点符号添加工具。给用户提供的这段文字加上合适的标点符号，不要改变、增加或删除任何文字内容，不要意译或纠正措辞。只输出加上标点后的文字本身，不要有任何解释、引号或其他前后缀。";
+
   function createVoiceController({ micBtn, statusEl, textarea }) {
     if (!VOICE_SUPPORTED) {
       micBtn.disabled = true;
@@ -1873,6 +1878,7 @@
     let requestingPermission = false;
     let finalTranscript = "";
     let baseValue = "";
+    let punctuateGeneration = 0;
 
     // Fully detach an instance's handlers and stop it. Reusing or
     // restarting a SpeechRecognition object after it has ended is
@@ -1951,6 +1957,10 @@
         requestingPermission = false;
       }
 
+      // Invalidate any punctuation pass still in flight from a previous
+      // recording so it can't overwrite what's about to be recorded now.
+      punctuateGeneration++;
+
       recording = true;
       finalTranscript = "";
       baseValue = textarea.value ? textarea.value + " " : "";
@@ -1961,17 +1971,43 @@
       launchInstance();
     }
 
+    // SpeechRecognition returns Chinese transcripts with no punctuation at
+    // all — run it through Claude to add punctuation, verbatim otherwise.
+    // Best-effort: on any failure (no API key, network, rate limit), just
+    // leave the raw transcript in place rather than blocking on it.
+    async function addPunctuation(prefix, transcript, generation) {
+      const apiKey = localStorage.getItem(STORAGE_KEYS.apiKey) || "";
+      if (!apiKey) return;
+      statusEl.textContent = "✏️ 添加标点中… Adding punctuation…";
+      try {
+        const punctuated = await callClaude([{ role: "user", content: transcript }], PUNCTUATION_SYSTEM_PROMPT);
+        if (generation !== punctuateGeneration) return; // superseded by a newer recording
+        const trimmed = punctuated.trim();
+        if (trimmed) textarea.value = prefix + trimmed;
+      } catch {
+        /* best-effort — keep the raw transcript on failure */
+      } finally {
+        if (generation === punctuateGeneration) statusEl.textContent = "";
+      }
+    }
+
     function stop() {
       if (!recording) return;
       recording = false;
       micBtn.classList.remove("recording");
       micBtn.title = "点击说话 Click to talk";
       if (micIcon) micIcon.textContent = "🎤";
-      statusEl.textContent = "";
       teardown(recognition);
       recognition = null;
       // Leave the transcript in the box for review — never auto-submit.
       textarea.focus();
+
+      const transcript = textarea.value.slice(baseValue.length);
+      if (getMicLang().startsWith("zh") && transcript.trim()) {
+        addPunctuation(baseValue, transcript, punctuateGeneration);
+      } else {
+        statusEl.textContent = "";
+      }
     }
 
     micBtn.addEventListener("click", (e) => {
@@ -2020,12 +2056,12 @@
     $("errorBox").classList.remove("visible");
   }
 
-  async function callClaude(messages) {
+  async function callClaude(messages, systemPromptOverride) {
     const apiKey = localStorage.getItem(STORAGE_KEYS.apiKey) || "";
     if (!apiKey) {
       throw new Error("请先在设置中填入 Anthropic API Key。/ Please add your Anthropic API key in Settings first.");
     }
-    const systemPrompt = localStorage.getItem(STORAGE_KEYS.systemPrompt) || DEFAULT_SYSTEM_PROMPT;
+    const systemPrompt = systemPromptOverride || localStorage.getItem(STORAGE_KEYS.systemPrompt) || DEFAULT_SYSTEM_PROMPT;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
