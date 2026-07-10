@@ -402,6 +402,13 @@
   #ambientPanel { display: none; }
   #ambientPanel.open { display: block; }
   #ambientPanel h2 { font-size: 1rem; margin: 0 0 14px; }
+  #bowlStrikeBtn { margin-top: 8px; transition: transform 0.1s ease; }
+  #bowlStrikeBtn.struck { animation: bowlStrikePulse 0.6s ease-out; }
+  @keyframes bowlStrikePulse {
+    0% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(161, 84, 58, 0.35); }
+    60% { transform: scale(1); }
+    100% { box-shadow: 0 0 0 16px rgba(161, 84, 58, 0); }
+  }
   .ambient-controls-row {
     display: flex;
     align-items: center;
@@ -895,6 +902,12 @@
       <label style="font-weight:400; font-size:0.85rem; color:var(--text-soft);">定时 Timer</label>
       <div class="presets" id="ambientTimers"></div>
       <div class="ambient-countdown" id="ambientCountdown"></div>
+    </div>
+
+    <div class="field" style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+      <label style="font-weight:400; font-size:0.85rem; color:var(--text-soft);">🔔 颂钵单击 Singing bowl (single strike)</label>
+      <div class="hint">敲一下，让它慢慢余韵消散——想再敲随时点。<br>Strike it once and let the resonance slowly fade — hit it again anytime.</div>
+      <button class="secondary" id="bowlStrikeBtn" type="button">🔔 再敲一次 / Strike again</button>
     </div>
   </div>
 
@@ -1842,6 +1855,94 @@
     };
   })();
 
+  // ---------------------------------------------------------------------
+  // Singing bowl — single strike. Distinct from the continuous "颂钵"
+  // ambient loop above: this hits the bowl once (sharp attack, long slow
+  // decay) rather than looping, on its own dedicated AudioContext so it's
+  // independent of Ambient's play/pause/volume/timer state. Strikes are
+  // allowed to overlap — hitting it again while a previous strike is
+  // still ringing layers naturally, the same way a real bowl does.
+  // ---------------------------------------------------------------------
+
+  const SingingBowlStrike = (() => {
+    let ctx = null;
+
+    function ensureCtx() {
+      if (ctx && ctx.state === "closed") ctx = null;
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state !== "running") {
+        ctx.resume().catch((err) => {
+          showError(`无法播放颂钵。/ Couldn't play the bowl. (${err && err.message ? err.message : err})`);
+        });
+      }
+      return ctx;
+    }
+
+    function noiseBuffer(c, seconds) {
+      const len = Math.floor(c.sampleRate * seconds);
+      const buffer = c.createBuffer(1, len, c.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      return buffer;
+    }
+
+    // Each partial is actually a close pair of oscillators a couple Hz
+    // apart. Real singing bowls ring with two closely split resonant
+    // modes per partial, and the slight mismatch produces the slow
+    // wobble/beating that makes a struck bowl sound alive instead of a
+    // pure synth tone — sharp instant attack, then exponential decay to
+    // silence over the given duration.
+    function strikePartial(c, master, freq, peak, decaySeconds, now) {
+      const detune = 0.6 + Math.random() * 1.4;
+      [freq - detune / 2, freq + detune / 2].forEach((f) => {
+        const osc = c.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = f;
+        const gain = c.createGain();
+        gain.gain.setValueAtTime(peak / 2, now);
+        gain.gain.exponentialRampToValueAtTime(0.0005, now + decaySeconds);
+        osc.connect(gain); gain.connect(master);
+        osc.start(now);
+        osc.stop(now + decaySeconds + 0.2);
+      });
+    }
+
+    function strike() {
+      const c = ensureCtx();
+      const now = c.currentTime + 0.01;
+
+      const master = c.createGain();
+      master.gain.value = 0.5;
+      master.connect(c.destination);
+
+      // A brief filtered "mallet contact" click right at the strike instant.
+      const click = c.createBufferSource();
+      click.buffer = noiseBuffer(c, 0.08);
+      const clickFilter = c.createBiquadFilter();
+      clickFilter.type = "bandpass";
+      clickFilter.frequency.value = 2200;
+      clickFilter.Q.value = 0.6;
+      const clickGain = c.createGain();
+      clickGain.gain.setValueAtTime(0.12, now);
+      clickGain.gain.exponentialRampToValueAtTime(0.0005, now + 0.09);
+      click.connect(clickFilter); clickFilter.connect(clickGain); clickGain.connect(master);
+      click.start(now); click.stop(now + 0.1);
+
+      // Higher partials of a real bowl die out faster than the low
+      // fundamental, so the brightness fades first and leaves the low
+      // tone ringing longest — stagger the decay times (10-15s) to match.
+      strikePartial(c, master, 639, 0.24, 10 + Math.random(), now);
+      strikePartial(c, master, 528, 0.34, 12 + Math.random(), now);
+      strikePartial(c, master, 396, 0.30, 14 + Math.random(), now);
+
+      // Tear down this strike's gain node once everything under it has
+      // finished ringing, so nodes don't linger forever.
+      setTimeout(() => { try { master.disconnect(); } catch { /* noop */ } }, 16000);
+    }
+
+    return { strike };
+  })();
+
   function renderAmbientPanel() {
     const soundsWrap = $("ambientSounds");
     soundsWrap.innerHTML = "";
@@ -1917,6 +2018,14 @@
   });
   $("ambientPlayBtn").addEventListener("click", () => Ambient.toggle());
   $("ambientVolume").addEventListener("input", (e) => Ambient.setVolume(Number(e.target.value) / 100));
+
+  $("bowlStrikeBtn").addEventListener("click", () => {
+    SingingBowlStrike.strike();
+    const btn = $("bowlStrikeBtn");
+    btn.classList.remove("struck");
+    void btn.offsetWidth; // restart the animation even on rapid re-strikes
+    btn.classList.add("struck");
+  });
 
   function playAmbientFromSuggestion(type) {
     $("ambientPanel").classList.add("open");
