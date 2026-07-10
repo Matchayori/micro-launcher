@@ -1,0 +1,2570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>微启动器 Micro-Launcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --bg-soft: #efeee8;
+    --card: #ffffff;
+    --border: #e3e1d8;
+    --text: #2f3430;
+    --text-soft: #6b7268;
+    --accent: #6b9080;
+    --accent-soft: #a4c3b2;
+    --accent-bg: #eaf2ee;
+    --warn-bg: #fbeee9;
+    --warn-text: #a1543a;
+    --radius: 16px;
+    --shadow: 0 2px 10px rgba(60, 60, 50, 0.06);
+    font-size: 17px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1e1c;
+      --bg-soft: #23261f;
+      --card: #262a25;
+      --border: #383c34;
+      --text: #e8e6de;
+      --text-soft: #a3a89c;
+      --accent: #8fb9a5;
+      --accent-soft: #4d6058;
+      --accent-bg: #2b3530;
+      --warn-bg: #3a2b24;
+      --warn-text: #e0a389;
+      --shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Cormorant Garamond", "Noto Serif SC", Georgia, serif;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button { font-family: inherit; }
+
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 28px 20px 80px;
+  }
+
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    margin: 0 0 4px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  header p {
+    margin: 0;
+    color: var(--text-soft);
+    font-size: 0.86rem;
+  }
+
+  .streak {
+    font-size: 0.78rem;
+    color: var(--accent);
+    margin-top: 6px;
+    font-weight: 500;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  .icon-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.15rem;
+    color: var(--text-soft);
+    transition: background 0.15s, color 0.15s;
+  }
+  .icon-btn:hover { background: var(--accent-bg); color: var(--accent); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 22px;
+    margin-bottom: 20px;
+  }
+
+  label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+  }
+
+  .hint {
+    color: var(--text-soft);
+    font-size: 0.82rem;
+    margin: -4px 0 10px;
+  }
+
+  textarea, input[type="text"], input[type="password"], input[type="url"] {
+    width: 100%;
+    font-family: inherit;
+    font-size: 0.98rem;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-soft);
+    color: var(--text);
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  textarea:focus, input:focus { border-color: var(--accent-soft); }
+
+  textarea#taskInput { min-height: 130px; }
+  textarea#emailInlineInput { min-height: 90px; }
+  textarea#replyInput { min-height: 54px; }
+  textarea#systemPrompt { min-height: 260px; font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; line-height: 1.5; }
+
+  /* Mic-enabled text inputs */
+  .input-with-mic { position: relative; }
+  .input-with-mic textarea { padding-right: 52px; }
+  .mic-btn {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-soft);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: background 0.15s, color 0.15s;
+  }
+  .mic-btn:hover { border-color: var(--accent-soft); color: var(--accent); }
+  .mic-btn.recording {
+    background: var(--warn-text);
+    color: #fff;
+    border-color: var(--warn-text);
+    animation: micPulse 1s ease-in-out infinite;
+  }
+  .mic-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  @keyframes micPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(161, 84, 58, 0.35); }
+    50% { box-shadow: 0 0 0 8px rgba(161, 84, 58, 0); }
+  }
+  .mic-meta {
+    min-height: 1.1em;
+    margin: 6px 0 0;
+    font-size: 0.78rem;
+    color: var(--accent);
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 4px;
+  }
+  .chip {
+    border: 1px solid var(--border);
+    background: var(--bg-soft);
+    color: var(--text-soft);
+    border-radius: 999px;
+    padding: 6px 13px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .chip:hover { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-soft); }
+  .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .templates-label {
+    font-size: 0.78rem;
+    color: var(--text-soft);
+    margin: 18px 0 8px;
+    text-align: center;
+  }
+  .templates {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .template-card {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 0.88rem;
+    color: var(--text-soft);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .template-card:hover { background: var(--accent-bg); border-color: var(--accent-soft); color: var(--text); }
+
+  /* Eisenhower quadrant picker */
+  .quadrant-recap-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .quadrant-recap {
+    font-size: 0.85rem;
+    color: var(--text-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .quadrant-edit-link {
+    background: none;
+    border: none;
+    color: var(--text-soft);
+    font-size: 0.78rem;
+    cursor: pointer;
+    flex: 0 0 auto;
+    padding: 0;
+  }
+  .quadrant-edit-link:hover { color: var(--accent); }
+  .quadrant-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 12px 0 14px;
+  }
+  .quadrant-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 22px 10px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    text-align: center;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: var(--text);
+    transition: transform 0.1s, filter 0.15s;
+  }
+  .quadrant-cell:hover { filter: brightness(1.04); }
+  .quadrant-cell:active { transform: scale(0.97); }
+  .quadrant-emoji { font-size: 1.5rem; }
+  .quadrant-label { font-weight: 500; }
+  .quadrant-urgent-important { background: #fbe4dd; border-color: #e3a08e; }
+  .quadrant-important-not-urgent { background: #fbf2d9; border-color: #d9c079; }
+  .quadrant-urgent-not-important { background: #fbe9d6; border-color: #e0b077; }
+  .quadrant-neither { background: #e5f0e8; border-color: var(--accent-soft); }
+
+  @media (prefers-color-scheme: dark) {
+    .quadrant-urgent-important { background: #4a2e28; border-color: #8a5346; }
+    .quadrant-important-not-urgent { background: #453f22; border-color: #8a7a3f; }
+    .quadrant-urgent-not-important { background: #453321; border-color: #8a6a3f; }
+    .quadrant-neither { background: #26332c; border-color: var(--accent-soft); }
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.88rem;
+    color: var(--text-soft);
+    margin: 14px 0 2px;
+  }
+  .toggle-row:hover { color: var(--accent); }
+
+  /* Email box — only appears once the AI recognizes an email is involved */
+  .email-inline { display: none; margin-bottom: 12px; }
+  .email-inline.visible { display: block; }
+  .email-inline label { font-weight: 400; font-size: 0.82rem; color: var(--text-soft); }
+
+  button.primary {
+    width: 100%;
+    margin-top: 16px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.05s;
+  }
+  button.primary:hover { filter: brightness(1.06); }
+  button.primary:active { transform: scale(0.995); }
+  button.primary:disabled { opacity: 0.6; cursor: default; }
+
+  button.secondary {
+    background: var(--bg-soft);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  button.secondary:hover { border-color: var(--accent-soft); }
+
+  .error-box {
+    display: none;
+    margin-top: 16px;
+    background: var(--warn-bg);
+    color: var(--warn-text);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 0.88rem;
+  }
+  .error-box.visible { display: block; }
+
+  /* Settings panel */
+  #settingsPanel { display: none; }
+  #settingsPanel.open { display: block; }
+  #settingsPanel h2 { font-size: 1rem; margin: 0 0 14px; }
+  .field { margin-bottom: 18px; }
+  .field:last-child { margin-bottom: 0; }
+  .row-flex { display: flex; gap: 8px; align-items: center; }
+  .row-flex input { flex: 1; }
+
+  .links-editor { display: flex; flex-direction: column; gap: 8px; }
+  .link-row { display: flex; gap: 8px; }
+  .link-row input:first-child { flex: 0 0 34%; }
+  .link-row input:last-child { flex: 1; }
+  .link-row button { flex: 0 0 auto; }
+
+  .settings-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+  }
+
+  /* Ambient sound panel */
+  #ambientPanel { display: none; }
+  #ambientPanel.open { display: block; }
+  #ambientPanel h2 { font-size: 1rem; margin: 0 0 14px; }
+  .ambient-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .ambient-controls-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+  }
+  .ambient-controls-row label {
+    margin: 0;
+    font-weight: 400;
+    font-size: 0.85rem;
+    color: var(--text-soft);
+    white-space: nowrap;
+  }
+  .ambient-countdown {
+    font-size: 0.82rem;
+    color: var(--text-soft);
+    margin-top: 10px;
+    min-height: 1.2em;
+  }
+
+  /* Chat / conversation */
+  #chatArea { display: none; }
+  #chatArea.open { display: block; }
+  .chat-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 4px 2px 10px;
+    margin-bottom: 14px;
+  }
+  .bubble {
+    max-width: 88%;
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+  .bubble p { margin: 0 0 10px; white-space: pre-wrap; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .bubble ul { margin: 0 0 10px; padding-left: 20px; }
+  .bubble ul:last-child { margin-bottom: 0; }
+  .bubble h3 {
+    margin: 0 0 6px;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+  }
+  .bubble-user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+    white-space: pre-wrap;
+  }
+  .bubble-assistant {
+    align-self: flex-start;
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-soft);
+    border-bottom-left-radius: 4px;
+  }
+  .bubble-typing {
+    align-self: flex-start;
+    display: flex;
+    gap: 4px;
+    padding: 14px 16px;
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-soft);
+    border-radius: 16px;
+    border-bottom-left-radius: 4px;
+  }
+  .bubble-typing span {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    animation: typingBounce 1.1s infinite ease-in-out;
+  }
+  .bubble-typing span:nth-child(2) { animation-delay: 0.15s; }
+  .bubble-typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+
+  .ambient-suggest {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--accent-soft);
+    font-size: 0.85rem;
+  }
+  .ambient-suggest .presets { margin-top: 8px; }
+
+  .inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .inline-actions .launch-link { padding: 8px 14px; font-size: 0.85rem; }
+
+  .draft-actions {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--accent-soft);
+  }
+  .draft-copy-note {
+    font-size: 0.82rem;
+    color: var(--accent);
+    margin-top: 8px;
+    min-height: 1.1em;
+  }
+
+  /* "I did it" completion */
+  .completion-row { display: none; margin: 2px 0 18px; text-align: center; }
+  .completion-row.visible { display: block; }
+  .completion-message {
+    margin-top: 10px;
+    color: var(--accent);
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .reply-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .reply-row .input-with-mic { flex: 1; }
+  .reply-row .icon-btn { width: 46px; height: 46px; font-size: 1.2rem; }
+
+  /* Quick launch links */
+  .launch-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .launch-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .launch-link:hover { background: var(--accent-bg); border-color: var(--accent-soft); }
+
+  .section-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-soft);
+    margin: 0 0 12px;
+  }
+
+  .save-note {
+    font-size: 0.78rem;
+    color: var(--text-soft);
+    margin-top: 8px;
+  }
+
+  /* History sidebar */
+  .drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 20, 15, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 900;
+  }
+  .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  .history-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: min(400px, 100vw);
+    background: var(--card);
+    border-left: 1px solid var(--border);
+    box-shadow: -6px 0 28px rgba(0, 0, 0, 0.14);
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    z-index: 901;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .history-drawer.open { transform: translateX(0); }
+
+  .history-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .history-drawer-header h2 { font-size: 1.1rem; margin: 0; }
+
+  .history-stats {
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-soft);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    font-size: 0.85rem;
+    color: var(--text);
+  }
+  .history-stats div { margin-bottom: 6px; }
+  .history-stats div:last-child { margin-bottom: 0; }
+
+  .history-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .history-empty {
+    color: var(--text-soft);
+    font-size: 0.88rem;
+    text-align: center;
+    padding: 30px 10px;
+  }
+
+  .history-item {
+    border: 1px solid var(--border);
+    background: var(--bg-soft);
+    border-radius: 12px;
+    padding: 12px 40px 12px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.2s;
+    position: relative;
+  }
+  .history-item:hover { border-color: var(--accent-soft); background: var(--accent-bg); }
+  .history-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .history-item-date { font-size: 0.74rem; color: var(--text-soft); }
+  .history-item-status { font-size: 0.8rem; }
+  .history-item-preview {
+    font-size: 0.88rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .history-item-delete {
+    position: absolute;
+    top: 10px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--text-soft);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 4px 6px;
+    border-radius: 6px;
+    opacity: 0.65;
+    transition: opacity 0.15s, color 0.15s;
+  }
+  .history-item-delete:hover { opacity: 1; color: var(--warn-text); }
+
+  .history-detail { display: none; }
+  .history-detail.open { display: flex; flex-direction: column; flex: 1; }
+  .history-detail-header { margin-bottom: 4px; }
+  .history-back-btn {
+    background: none;
+    border: none;
+    color: var(--text-soft);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0;
+  }
+  .history-back-btn:hover { color: var(--accent); }
+  .history-detail-thread {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: visible;
+  }
+  .history-detail-thread .bubble { max-width: 100%; }
+
+  .history-footer {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .history-footer button { width: 100%; }
+
+  /* Celebration confetti */
+  .confetti-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 999;
+  }
+  .confetti-piece {
+    position: absolute;
+    top: -20px;
+    border-radius: 2px;
+    opacity: 0.9;
+    animation-name: confettiFall;
+    animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    animation-fill-mode: forwards;
+  }
+  @keyframes confettiFall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 0.95; }
+    100% { transform: translateY(110vh) rotate(540deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>微启动器 Micro-Launcher</h1>
+      <p>不一定是逃避，可能只是还没找到入口。<br>It's not always avoidance — sometimes you just need a way in.</p>
+      <div class="streak" id="streakCounter"></div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="historyToggle" title="历史记录 History">📋</button>
+      <button class="icon-btn" id="ambientToggle" title="环境音 Ambient sound">🎧</button>
+      <button class="icon-btn" id="settingsToggle" title="设置 Settings">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Main card — the first thing you interact with: one box, one button -->
+  <div class="card">
+
+    <!-- Starter form: shown before a conversation begins -->
+    <div id="starterForm">
+      <div id="taskStep">
+        <label for="taskInput">今天卡在哪儿了？Where are you stuck today?</label>
+        <div class="hint">打字，或按住 🎤 / 空格键说话。<br>Type, or hold 🎤 / Space to talk.</div>
+
+        <div class="input-with-mic">
+          <textarea id="taskInput" placeholder="例如：我需要回复导师的邮件，但一想到打开邮箱就很抗拒…&#10;e.g. I need to reply to my advisor's email but I feel a wall of resistance just thinking about opening my inbox…" autofocus></textarea>
+          <button class="mic-btn" id="taskMicBtn" type="button" title="按住说话 Hold to talk">🎤</button>
+        </div>
+        <div class="mic-meta" id="taskMicStatus"></div>
+
+        <button class="primary" id="submitBtn" type="button">说吧 Just say it</button>
+
+        <div class="templates-label">或者，从这里开始 / Or start from one of these</div>
+        <div class="templates" id="templateCards"></div>
+      </div>
+
+      <!-- Eisenhower quadrant step — shown after the task is described, before the AI responds -->
+      <div id="quadrantStep" style="display:none;">
+        <div class="quadrant-recap-row">
+          <span class="quadrant-recap" id="quadrantRecap"></span>
+          <button type="button" class="quadrant-edit-link" id="quadrantEditBtn">✎ 改一下 Edit</button>
+        </div>
+        <div class="hint" style="text-align:center; margin-top:2px;">这件事大概是…… / This is roughly...</div>
+        <div class="quadrant-grid">
+          <button type="button" class="quadrant-cell quadrant-urgent-important" data-quadrant="urgent-important">
+            <span class="quadrant-emoji">🔴</span>
+            <span class="quadrant-label">重要且紧急<br>Important &amp; Urgent</span>
+          </button>
+          <button type="button" class="quadrant-cell quadrant-important-not-urgent" data-quadrant="important-not-urgent">
+            <span class="quadrant-emoji">🟡</span>
+            <span class="quadrant-label">重要不紧急<br>Important, Not Urgent</span>
+          </button>
+          <button type="button" class="quadrant-cell quadrant-urgent-not-important" data-quadrant="urgent-not-important">
+            <span class="quadrant-emoji">🟠</span>
+            <span class="quadrant-label">不重要但紧急<br>Urgent, Not Important</span>
+          </button>
+          <button type="button" class="quadrant-cell quadrant-neither" data-quadrant="neither">
+            <span class="quadrant-emoji">🟢</span>
+            <span class="quadrant-label">不重要不紧急<br>Not Important/Urgent</span>
+          </button>
+        </div>
+        <div class="toggle-row" id="quadrantSkip" style="justify-content:center;">跳过，直接聊 / Skip, just talk</div>
+      </div>
+    </div>
+
+    <!-- Chat area: shown once a conversation has started -->
+    <div id="chatArea">
+      <div class="toggle-row" id="startOverBtn">↺ 重新开始 Start over</div>
+
+      <div class="chat-thread" id="chatThread"></div>
+
+      <div class="completion-row" id="completionRow">
+        <button class="primary" id="completedBtn" type="button">我做到了 ✓ I did it</button>
+        <div class="completion-message" id="completionMessage"></div>
+      </div>
+
+      <!-- Only revealed once the AI's reply suggests this is about an email -->
+      <div class="email-inline" id="emailInlineBox">
+        <label for="emailInlineInput">📧 需要的话，把邮件原文粘贴在这里 / Paste the email here if it helps</label>
+        <textarea id="emailInlineInput" placeholder="粘贴邮件原文… 发送下一条消息时会自动附上。/ Paste it — it'll be attached to your next message."></textarea>
+      </div>
+
+      <div class="reply-row">
+        <div class="input-with-mic">
+          <textarea id="replyInput" rows="2" placeholder="继续说… / Keep going…"></textarea>
+          <button class="mic-btn" id="replyMicBtn" type="button" title="按住说话 Hold to talk">🎤</button>
+        </div>
+        <button class="icon-btn" id="replySendBtn" title="发送 Send" type="button">➤</button>
+      </div>
+      <div class="mic-meta" id="replyMicStatus"></div>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <!-- Quick launch (secondary — the AI also surfaces the relevant one inline) -->
+  <div>
+    <div class="section-title">🚀 快速启动 Quick launch</div>
+    <div class="launch-grid" id="launchGrid"></div>
+  </div>
+
+  <!-- Settings -->
+  <div class="card" id="settingsPanel">
+    <h2>⚙️ 设置 Settings</h2>
+
+    <div class="field">
+      <label for="apiKeyInput">Anthropic API Key</label>
+      <div class="hint">仅保存在本机浏览器 localStorage 中，只会发送给 Anthropic API。<br>Stored only in your browser's localStorage — sent only to Anthropic's API.</div>
+      <div class="row-flex">
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+        <button class="secondary" id="toggleKeyVisibility" type="button">👁</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>语音识别语言 Voice recognition language</label>
+      <div class="hint">按住 🎤 说话时使用的识别语言。<br>Language used when you hold 🎤 to talk.</div>
+      <div class="presets" id="micLangOptions"></div>
+    </div>
+
+    <div class="field">
+      <label for="systemPrompt">系统提示词 System Prompt</label>
+      <div class="hint">可以随时修改、调优这段提示词。<br>Edit this anytime to refine how the app diagnoses and helps you.</div>
+      <textarea id="systemPrompt" spellcheck="false"></textarea>
+      <div class="settings-actions">
+        <button class="secondary" id="resetPromptBtn" type="button">恢复默认 Reset to default</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>快速启动链接 Quick-launch links</label>
+      <div class="hint">底部显示的快捷入口，也用于对话中「打开 Gmail/Outlook」按钮的匹配。<br>Shown at the bottom — also used to match the inline "Open Gmail/Outlook" button in chat.</div>
+      <div class="links-editor" id="linksEditor"></div>
+      <div class="settings-actions">
+        <button class="secondary" id="addLinkBtn" type="button">+ 添加链接 Add link</button>
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="primary" id="saveSettingsBtn" type="button" style="margin-top:0;">保存设置 Save settings</button>
+    </div>
+    <div class="save-note" id="saveNote"></div>
+  </div>
+
+  <!-- Ambient sound -->
+  <div class="card" id="ambientPanel">
+    <h2>🎧 环境音 Ambient sound</h2>
+    <div class="hint">找点声音陪着你，帮自己更容易进入状态。所有声音都在浏览器里实时生成，不需要联网下载。<br>Some sound to ease you into the task — generated live in the browser, no downloads needed.</div>
+
+    <div class="presets" id="ambientSounds"></div>
+
+    <div class="ambient-controls-row">
+      <button class="secondary" id="ambientPlayBtn" type="button">▶️ 播放 Play</button>
+      <label for="ambientVolume">音量 Vol</label>
+      <input type="range" id="ambientVolume" min="0" max="100" value="50">
+    </div>
+
+    <div class="field" style="margin-top:16px;">
+      <label style="font-weight:400; font-size:0.85rem; color:var(--text-soft);">定时 Timer</label>
+      <div class="presets" id="ambientTimers"></div>
+      <div class="ambient-countdown" id="ambientCountdown"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- History sidebar -->
+<div class="drawer-backdrop" id="historyBackdrop"></div>
+<div class="history-drawer" id="historyDrawer">
+  <div class="history-drawer-header">
+    <h2>📋 历史记录 History</h2>
+    <button class="icon-btn" id="historyCloseBtn" title="关闭 Close">✕</button>
+  </div>
+
+  <div class="history-stats" id="historyStats"></div>
+
+  <div class="history-list" id="historyList"></div>
+
+  <div class="history-detail" id="historyDetail">
+    <div class="history-detail-header">
+      <button type="button" class="history-back-btn" id="historyBackBtn">← 返回列表 Back to list</button>
+    </div>
+    <div class="hint" id="historyDetailMeta" style="margin-bottom:10px;"></div>
+    <div class="history-detail-thread" id="historyDetailThread"></div>
+  </div>
+
+  <div class="history-footer">
+    <button class="secondary" id="clearHistoryBtn" type="button">🗑 清除全部 Clear all</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // Config & defaults — extend these freely.
+  // ---------------------------------------------------------------------
+
+  const STORAGE_KEYS = {
+    apiKey: "microLauncher_apiKey",
+    systemPrompt: "microLauncher_systemPrompt",
+    quickLinks: "microLauncher_quickLinks",
+    micLang: "microLauncher_micLang",
+    completions: "microLauncher_completions",
+    history: "microLauncher_history",
+  };
+
+  const MODEL = "claude-sonnet-4-6";
+
+  const DEFAULT_SYSTEM_PROMPT = `你是一位深刻理解 ADHD 与执行功能障碍（executive dysfunction）的教练，正在和用户进行一段多轮对话——不是一次性给答案，而是像一个愿意坐下来陪他们聊聊的朋友。
+
+对话背景：用户此刻卡在某件事上，无法开始。第一条消息通常描述的是"表面任务"（比如"要回一封邮件"），但卡住的真正原因，往往藏在表面任务之下——可能是一个还没准备好面对的决定、一种说不清的情绪、对某个结果的恐惧、完美主义、精力枯竭，等等。对话过程中用户也可能提供需要回复的邮件原文。
+
+用户的第一条消息里，可能会附带一个用「[优先级象限 / Priority quadrant: ...]」标出的标签——这是用户自己用"重要/紧急"四象限法给这件事的定位，请据此调整你的开场策略：
+
+- 🔴 重要且紧急 (Important & Urgent)：不要深入探索。第一轮就直接给出最小、最快能启动的一步，语气紧凑、行动优先，可以用类似"别想了，先做这一步 / Stop thinking, do this one thing right now."的语气开场，然后直接输出**试试这个 / Try this:**（**卡住的原因**可以省略，或只用一句话带过）。
+- 🟡 重要不紧急 (Important, Not Urgent)：这正是最需要深入对话的情况——按下面默认的"先探索、再行动"来做，多花几轮时间，认真挖掘背后的完美主义、恐惧、情绪负担等更深层原因，不要急着给行动。
+- 🟠 不重要但紧急 (Urgent, Not Important)：帮用户又快又"糙"地把它解决掉——"糙"是重点，不追求完美，只求脱手。第一轮就可以直接给模板、草稿或者最省力的做法，不需要深挖情绪。
+- 🟢 不重要不紧急 (Not Important, Not Urgent)：先别急着帮他规划怎么做。第一轮温和地反问一句，比如"这件事真的需要现在做吗？/ Does this actually need your attention right now?"，帮他看看这件事是否真的值得现在花精力，要不要把注意力挪去更重要的事情上。如果用户说这件事其实还是想做/需要做，再转入正常的探索或行动流程。
+
+如果消息里没有象限标签，按下面默认的"先探索、再行动"来处理。
+
+你的行为准则：
+
+1. 第一轮回复（默认情况，或象限是 🟡 重要不紧急时）：不要急着给解决方案。先用1-2句话，温和地反映你注意到的东西——可以是语气、用词、或没说出口的部分，提出一个*可能*的更深层原因（用试探性的语气，不要下定论）。然后问一个开放、温柔的问题，邀请对方多说一点。这一轮**不要**输出"试试这个 / Try this:"这个标题，也不要给出具体行动建议——你还在了解情况。
+
+2. 后续每一轮：继续倾听，用对方的话反映你听到的内容（"听起来你其实是……"），如果真正的卡点还不清楚，就再温柔地追问一层。如果对方已经说出/承认了真正的卡点，或者已经聊了几轮、对方看起来想往前走了，就转入"给出行动"的这一轮：
+   - 用这两个标题：
+     **卡住的原因 / What's blocking you:**（现在要点出你们一起挖到的、更深层的真正原因，而不是最初的表面任务）
+     **试试这个 / Try this:**（一个具体、微小、有创意的下一步行动，针对这个更深层的原因量身定制）
+   - 如果用户在对话中提供了需要回复的邮件原文（格式类似"我需要回复的邮件原文："），而这封邮件还没被处理，也加上：
+     **回复草稿 / Draft reply:**（格式完整、可以直接复制粘贴使用的草稿——包含称呼/问候语、分段清楚的正文、结尾礼貌语和署名占位符，例如"[你的名字]"。语气可以放松、不追求完美，但结构要像一封正常的邮件，而不是几句零散的话。）
+   - 这个结构只在"给出行动"的那一轮输出一次；之后如果对方继续聊，就自然回应即可，除非又冒出了新的卡点。
+
+3. 不要在还没听对方多说一点之前就跳到建议——除非用户在第一句话里已经自己把真正的卡点说得很清楚了，或者象限是 🔴/🟠（见上面的分象限指引），那样可以直接进入"给出行动"。
+
+4. 语气：温暖、不评判、简短——这个人此刻的执行功能容量很低，不需要长篇大论、不要说教、不要免责声明。每一轮回复通常只需要2-4句话。
+
+5. 用用户书写时使用的语言回复（中文、英文，或中英混合都可以）。
+
+记住：这是一段对话，不是问答机——先陪伴、再挖掘、最后才是行动（🔴 和 🟠 象限除外，那两种情况请直接给行动）。`;
+
+  const DEFAULT_QUICK_LINKS = [
+    { name: "Gmail", url: "https://mail.google.com" },
+    { name: "Outlook", url: "https://outlook.office.com" },
+    { name: "Google Scholar", url: "https://scholar.google.com" },
+    { name: "University Portal", url: "https://example.edu" },
+  ];
+
+  // Eisenhower quadrants — shown after the task is described, before the
+  // AI responds. Their id/zh/en get embedded in the first message so the
+  // system prompt can adapt its strategy per quadrant.
+  const QUADRANTS = [
+    { id: "urgent-important", emoji: "🔴", zh: "重要且紧急", en: "Important & Urgent" },
+    { id: "important-not-urgent", emoji: "🟡", zh: "重要不紧急", en: "Important, Not Urgent" },
+    { id: "urgent-not-important", emoji: "🟠", zh: "不重要但紧急", en: "Urgent, Not Important" },
+    { id: "neither", emoji: "🟢", zh: "不重要不紧急", en: "Not Important, Not Urgent" },
+  ];
+
+  // Quick-start scenario cards shown on the starter screen — clicking one
+  // pre-fills the task box with a starting sentence. Add more anytime.
+  const TEMPLATE_SCENARIOS = [
+    { emoji: "📧", zh: "有一封邮件一直没回...", en: "There's an email I keep putting off..." },
+    { emoji: "💬", zh: "有条消息不知道怎么回...", en: "Not sure how to reply to this message..." },
+    { emoji: "📝", zh: "有篇东西要写但不知道怎么开头...", en: "Need to write something but can't start..." },
+    { emoji: "📋", zh: "有个任务拖了很久...", en: "There's a task I've been avoiding..." },
+    { emoji: "🤷", zh: "说不清楚，就是不想动...", en: "I don't know, I just can't get going..." },
+  ];
+
+  // Ambient sound profiles (all synthesized client-side — see the Ambient
+  // module below). Add a new one by giving it an id/label here and a
+  // builder function in BUILDERS.
+  const SOUND_PROFILES = [
+    { id: "rain", label: "🌧 雨声 Rain" },
+    { id: "ocean", label: "🌊 海浪 Ocean" },
+    { id: "snow", label: "❄️ 雪 Snow" },
+    { id: "lofi", label: "🎵 Lo-fi" },
+    { id: "forest", label: "🌲 森林 Forest" },
+    { id: "white", label: "⚪ 白噪音 White noise" },
+  ];
+
+  const TIMER_OPTIONS = [
+    { id: 5, label: "5 分钟 5 min" },
+    { id: 15, label: "15 分钟 15 min" },
+    { id: 25, label: "25 分钟 Pomodoro" },
+    { id: 0, label: "∞ 不限时 No limit" },
+  ];
+
+  const MIC_LANG_OPTIONS = [
+    { id: "zh-CN", label: "🌐 中文" },
+    { id: "en-US", label: "🌐 English" },
+  ];
+
+  // Lightweight, no-API categorization of the "卡住的原因" text the AI writes,
+  // used only for the "most common blocker" insight in the history panel.
+  // Add more categories anytime — first pattern match wins.
+  const BLOCKER_CATEGORIES = [
+    { id: "perfectionism", zh: "完美主义", en: "Perfectionism", pattern: /完美主义|perfectionis/i },
+    { id: "fear", zh: "恐惧/害怕", en: "Fear", pattern: /恐惧|害怕|fear|afraid/i },
+    { id: "decision", zh: "决策困难", en: "Decision difficulty", pattern: /决策|决定|decision|抉择/i },
+    { id: "overwhelm", zh: "任务过大", en: "Overwhelm", pattern: /overwhelm|太大|压垮|不知从何/i },
+    { id: "energy", zh: "精力不足", en: "Low energy", pattern: /精力|能量|启动|energy|fatigue|exhaust/i },
+    { id: "rejection", zh: "怕被评判", en: "Fear of judgment", pattern: /拒绝|评判|judg|rejection/i },
+    { id: "emotional", zh: "情绪负担", en: "Emotional weight", pattern: /情绪|emotion/i },
+    { id: "boredom", zh: "缺乏兴趣", en: "Boredom", pattern: /无聊|boredom|boring/i },
+  ];
+
+  // Randomly-chosen encouragement shown after "我做到了 / I did it". Add more anytime.
+  const COMPLETION_MESSAGES = [
+    "太棒了，你迈出了那一步。 / Nice — you took the step.",
+    "看，没有想象中那么难。 / See, it wasn't as bad as it felt.",
+    "这就够了，为自己鼓掌。 / That's enough for now — give yourself credit.",
+    "启动永远是最难的部分，你做到了。 / Starting is always the hardest part, and you did it.",
+    "干得漂亮。 / Well done.",
+    "又往前挪了一步。 / One more step forward.",
+  ];
+
+  // ---------------------------------------------------------------------
+  // State + persistence
+  // ---------------------------------------------------------------------
+
+  const $ = (id) => document.getElementById(id);
+
+  function loadSettings() {
+    const apiKey = localStorage.getItem(STORAGE_KEYS.apiKey) || "";
+    const systemPrompt = localStorage.getItem(STORAGE_KEYS.systemPrompt) || DEFAULT_SYSTEM_PROMPT;
+    let quickLinks;
+    try {
+      quickLinks = JSON.parse(localStorage.getItem(STORAGE_KEYS.quickLinks));
+      if (!Array.isArray(quickLinks) || quickLinks.length === 0) throw new Error("empty");
+    } catch {
+      quickLinks = DEFAULT_QUICK_LINKS;
+    }
+    return { apiKey, systemPrompt, quickLinks };
+  }
+
+  let settings = loadSettings();
+
+  function persistSettings(newQuickLinks) {
+    localStorage.setItem(STORAGE_KEYS.apiKey, $("apiKeyInput").value.trim());
+    localStorage.setItem(STORAGE_KEYS.systemPrompt, $("systemPrompt").value);
+    localStorage.setItem(STORAGE_KEYS.quickLinks, JSON.stringify(newQuickLinks));
+    settings = loadSettings();
+  }
+
+  // ---------------------------------------------------------------------
+  // Settings panel rendering
+  // ---------------------------------------------------------------------
+
+  function renderLinksEditor(links) {
+    const editor = $("linksEditor");
+    editor.innerHTML = "";
+    links.forEach((link, i) => {
+      const row = document.createElement("div");
+      row.className = "link-row";
+      row.innerHTML = `
+        <input type="text" value="${escapeAttr(link.name)}" placeholder="名称 Name" data-field="name" data-index="${i}">
+        <input type="url" value="${escapeAttr(link.url)}" placeholder="https://…" data-field="url" data-index="${i}">
+        <button class="secondary" type="button" data-remove="${i}">✕</button>
+      `;
+      editor.appendChild(row);
+    });
+    editor.querySelectorAll("button[data-remove]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.remove);
+        currentLinksDraft.splice(idx, 1);
+        renderLinksEditor(currentLinksDraft);
+      });
+    });
+    editor.querySelectorAll("input").forEach((input) => {
+      input.addEventListener("input", () => {
+        const idx = Number(input.dataset.index);
+        currentLinksDraft[idx][input.dataset.field] = input.value;
+      });
+    });
+  }
+
+  let currentLinksDraft = [];
+
+  function openSettings() {
+    $("apiKeyInput").value = settings.apiKey;
+    $("systemPrompt").value = settings.systemPrompt;
+    currentLinksDraft = settings.quickLinks.map((l) => ({ ...l }));
+    renderLinksEditor(currentLinksDraft);
+    updateMicLangUI();
+    $("settingsPanel").classList.add("open");
+    $("ambientPanel").classList.remove("open");
+    $("saveNote").textContent = "";
+    $("settingsPanel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  $("settingsToggle").addEventListener("click", () => {
+    const panel = $("settingsPanel");
+    if (panel.classList.contains("open")) {
+      panel.classList.remove("open");
+    } else {
+      openSettings();
+    }
+  });
+
+  $("toggleKeyVisibility").addEventListener("click", () => {
+    const input = $("apiKeyInput");
+    input.type = input.type === "password" ? "text" : "password";
+  });
+
+  $("resetPromptBtn").addEventListener("click", () => {
+    $("systemPrompt").value = DEFAULT_SYSTEM_PROMPT;
+  });
+
+  $("addLinkBtn").addEventListener("click", () => {
+    currentLinksDraft.push({ name: "", url: "" });
+    renderLinksEditor(currentLinksDraft);
+  });
+
+  $("saveSettingsBtn").addEventListener("click", () => {
+    const cleanedLinks = currentLinksDraft
+      .map((l) => ({ name: l.name.trim(), url: l.url.trim() }))
+      .filter((l) => l.name && l.url);
+    persistSettings(cleanedLinks.length ? cleanedLinks : DEFAULT_QUICK_LINKS);
+    renderQuickLinks();
+    $("saveNote").textContent = "已保存 Saved ✓";
+    setTimeout(() => { $("saveNote").textContent = ""; }, 2000);
+  });
+
+  // ---------------------------------------------------------------------
+  // Voice recognition language (set in Settings, used by both mic buttons)
+  // ---------------------------------------------------------------------
+
+  function getMicLang() {
+    return localStorage.getItem(STORAGE_KEYS.micLang) || "zh-CN";
+  }
+  function setMicLang(lang) {
+    localStorage.setItem(STORAGE_KEYS.micLang, lang);
+  }
+
+  function updateMicLangUI() {
+    const current = getMicLang();
+    $("micLangOptions").querySelectorAll(".chip").forEach((chip) => {
+      chip.classList.toggle("active", chip.dataset.lang === current);
+    });
+  }
+
+  function renderMicLangOptions() {
+    const wrap = $("micLangOptions");
+    wrap.innerHTML = "";
+    MIC_LANG_OPTIONS.forEach((opt) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip";
+      chip.dataset.lang = opt.id;
+      chip.textContent = opt.label;
+      chip.addEventListener("click", () => {
+        setMicLang(opt.id);
+        updateMicLangUI();
+      });
+      wrap.appendChild(chip);
+    });
+    updateMicLangUI();
+  }
+
+  // ---------------------------------------------------------------------
+  // Quick-launch links
+  // ---------------------------------------------------------------------
+
+  function renderQuickLinks() {
+    const grid = $("launchGrid");
+    grid.innerHTML = "";
+    settings.quickLinks.forEach((link) => {
+      const a = document.createElement("a");
+      a.className = "launch-link";
+      a.href = link.url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = link.name;
+      grid.appendChild(a);
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Quick-start template cards (starter screen only)
+  // ---------------------------------------------------------------------
+
+  function renderTemplateCards() {
+    const wrap = $("templateCards");
+    wrap.innerHTML = "";
+    TEMPLATE_SCENARIOS.forEach((t) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "template-card";
+      card.textContent = `${t.emoji} ${t.zh} / ${t.en}`;
+      card.addEventListener("click", () => {
+        const box = $("taskInput");
+        box.value = `${t.zh} `;
+        box.focus();
+        box.setSelectionRange(box.value.length, box.value.length);
+      });
+      wrap.appendChild(card);
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Daily completion counter — "今天突破了 X 件事 / X things started today"
+  // ---------------------------------------------------------------------
+
+  function todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  function loadCompletionCount() {
+    let data;
+    try { data = JSON.parse(localStorage.getItem(STORAGE_KEYS.completions)); } catch { data = null; }
+    const today = todayKey();
+    if (!data || data.date !== today) {
+      data = { date: today, count: 0 };
+      localStorage.setItem(STORAGE_KEYS.completions, JSON.stringify(data));
+    }
+    return data.count;
+  }
+
+  function bumpCompletionCount() {
+    const count = loadCompletionCount() + 1;
+    localStorage.setItem(STORAGE_KEYS.completions, JSON.stringify({ date: todayKey(), count }));
+    return count;
+  }
+
+  function renderStreak() {
+    const count = loadCompletionCount();
+    $("streakCounter").textContent = count > 0
+      ? `🔥 今天突破了 ${count} 件事 / ${count} thing${count === 1 ? "" : "s"} started today`
+      : "";
+  }
+
+  // ---------------------------------------------------------------------
+  // Celebration — a one-shot chime + applause (Web Audio API, no audio
+  // files) plus a confetti burst, played when "我做到了" is clicked.
+  // ---------------------------------------------------------------------
+
+  const Celebration = (() => {
+    let ctx = null;
+
+    function ensureCtx() {
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+
+    function noiseBuffer(c, seconds) {
+      const len = Math.floor(c.sampleRate * seconds);
+      const buffer = c.createBuffer(1, len, c.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      return buffer;
+    }
+
+    function playChime(c, startAt) {
+      // A little ascending bell flourish — C5 E5 G5 C6 E6.
+      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+      notes.forEach((freq, i) => {
+        const t = startAt + i * 0.09;
+        const osc = c.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const overtone = c.createOscillator();
+        overtone.type = "triangle";
+        overtone.frequency.value = freq * 2;
+        const g = c.createGain();
+        g.gain.value = 0;
+        const og = c.createGain();
+        og.gain.value = 0;
+        osc.connect(g); g.connect(c.destination);
+        overtone.connect(og); og.connect(c.destination);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.22, t + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+        og.gain.setValueAtTime(0, t);
+        og.gain.linearRampToValueAtTime(0.06, t + 0.008);
+        og.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+        osc.start(t); osc.stop(t + 0.75);
+        overtone.start(t); overtone.stop(t + 0.55);
+      });
+    }
+
+    function playApplause(c, startAt, duration) {
+      // A brief crowd-clap swell: many short bandpass-filtered noise bursts,
+      // randomly timed, under one gain envelope that rises then tapers.
+      const master = c.createGain();
+      master.gain.value = 0;
+      master.connect(c.destination);
+      master.gain.setValueAtTime(0, startAt);
+      master.gain.linearRampToValueAtTime(0.5, startAt + duration * 0.25);
+      master.gain.linearRampToValueAtTime(0.35, startAt + duration * 0.6);
+      master.gain.linearRampToValueAtTime(0, startAt + duration);
+
+      const clapCount = 70;
+      for (let i = 0; i < clapCount; i++) {
+        const t = startAt + Math.random() * duration;
+        const src = c.createBufferSource();
+        src.buffer = noiseBuffer(c, 0.06);
+        const bp = c.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 1500 + Math.random() * 2000;
+        bp.Q.value = 0.8;
+        const g = c.createGain();
+        g.gain.value = 0;
+        src.connect(bp); bp.connect(g); g.connect(master);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.8, t + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.05 + Math.random() * 0.03);
+        src.start(t);
+        src.stop(t + 0.1);
+      }
+    }
+
+    function play() {
+      const c = ensureCtx();
+      const now = c.currentTime + 0.02;
+      playChime(c, now);
+      playApplause(c, now + 0.15, 1.6);
+    }
+
+    return { play };
+  })();
+
+  const CONFETTI_COLORS = ["#6b9080", "#a4c3b2", "#e8b86d", "#e0a389", "#8fb9a5"];
+
+  function launchConfetti() {
+    const layer = document.createElement("div");
+    layer.className = "confetti-layer";
+    document.body.appendChild(layer);
+
+    const pieceCount = 28;
+    for (let i = 0; i < pieceCount; i++) {
+      const piece = document.createElement("div");
+      piece.className = "confetti-piece";
+      const size = 6 + Math.random() * 6;
+      piece.style.left = `${Math.random() * 100}vw`;
+      piece.style.width = `${size}px`;
+      piece.style.height = `${size * 1.6}px`;
+      piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+      piece.style.animationDuration = `${1.8 + Math.random() * 1.4}s`;
+      piece.style.animationDelay = `${Math.random() * 0.3}s`;
+      layer.appendChild(piece);
+    }
+
+    setTimeout(() => layer.remove(), 3400);
+  }
+
+  // ---------------------------------------------------------------------
+  // Tiny markdown-ish renderer (bold + paragraphs + bullets)
+  // ---------------------------------------------------------------------
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return String(str ?? "").replace(/"/g, "&quot;");
+  }
+
+  function renderLite(text) {
+    const lines = text.split("\n");
+    let html = "";
+    let inList = false;
+
+    const closeList = () => { if (inList) { html += "</ul>"; inList = false; } };
+
+    for (let raw of lines) {
+      const line = raw.trim();
+      if (!line) { closeList(); continue; }
+
+      const bulletMatch = line.match(/^[-•]\s+(.*)/);
+      if (bulletMatch) {
+        if (!inList) { html += "<ul>"; inList = true; }
+        html += `<li>${inlineFormat(bulletMatch[1])}</li>`;
+        continue;
+      }
+
+      closeList();
+
+      const headingMatch = line.match(/^\*\*(.+?)\*\*\s*:?\s*$/);
+      if (headingMatch) {
+        html += `<h3>${escapeHtml(headingMatch[1])}</h3>`;
+        continue;
+      }
+
+      html += `<p>${inlineFormat(line)}</p>`;
+    }
+    closeList();
+    return html;
+  }
+
+  function inlineFormat(str) {
+    const escaped = escapeHtml(str);
+    return escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  }
+
+  // ---------------------------------------------------------------------
+  // Ambient sound engine — procedurally generated via Web Audio API, so
+  // it always works fully offline. Add a new sound by adding an entry to
+  // SOUND_PROFILES above and a matching builder function in BUILDERS.
+  // ---------------------------------------------------------------------
+
+  const Ambient = (() => {
+    let ctx = null;
+    let masterGain = null;
+    let activeNodes = [];
+    let scheduledIntervals = [];
+    let currentSound = null;
+    let isPlaying = false;
+    let targetVolume = 0.5;
+    let timerMinutes = 0;
+    let timerEndsAt = null;
+    let countdownInterval = null;
+    let onStateChange = () => {};
+
+    function ensureCtx() {
+      if (!ctx) {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = ctx.createGain();
+        masterGain.gain.value = 0;
+        masterGain.connect(ctx.destination);
+      }
+      if (ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+
+    function noiseBuffer(context, seconds) {
+      const len = Math.floor(context.sampleRate * seconds);
+      const buffer = context.createBuffer(1, len, context.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      return buffer;
+    }
+
+    function track(node) { activeNodes.push(node); return node; }
+
+    function clearNodes() {
+      activeNodes.forEach((n) => {
+        try { n.stop && n.stop(); } catch { /* already stopped */ }
+        try { n.disconnect && n.disconnect(); } catch { /* noop */ }
+      });
+      activeNodes = [];
+      scheduledIntervals.forEach((t) => clearInterval(t));
+      scheduledIntervals = [];
+    }
+
+    function buildRain(c, out) {
+      const src = track(c.createBufferSource());
+      src.buffer = noiseBuffer(c, 4);
+      src.loop = true;
+      const hp = track(c.createBiquadFilter()); hp.type = "highpass"; hp.frequency.value = 1000;
+      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 7000;
+      src.connect(hp); hp.connect(lp); lp.connect(out);
+      const lfo = track(c.createOscillator()); lfo.frequency.value = 0.18;
+      const lfoGain = track(c.createGain()); lfoGain.gain.value = 0.12;
+      lfo.connect(lfoGain); lfoGain.connect(out.gain);
+      out.gain.value = 0.75;
+      src.start(); lfo.start();
+    }
+
+    function buildOcean(c, out) {
+      const src = track(c.createBufferSource());
+      src.buffer = noiseBuffer(c, 6);
+      src.loop = true;
+      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 800;
+      src.connect(lp); lp.connect(out);
+      const lfo = track(c.createOscillator()); lfo.type = "sine"; lfo.frequency.value = 0.09;
+      const lfoGain = track(c.createGain()); lfoGain.gain.value = 0.45;
+      lfo.connect(lfoGain); lfoGain.connect(out.gain);
+      out.gain.value = 0.5;
+      src.start(); lfo.start();
+    }
+
+    function buildSnow(c, out) {
+      // A hushed, muffled bed (heavy low-pass) with a very slow gust swell
+      // and rare, faint "crunch" bursts — like standing in falling snow.
+      const src = track(c.createBufferSource());
+      src.buffer = noiseBuffer(c, 6);
+      src.loop = true;
+      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 450;
+      src.connect(lp); lp.connect(out);
+      const lfo = track(c.createOscillator()); lfo.type = "sine"; lfo.frequency.value = 0.05;
+      const lfoGain = track(c.createGain()); lfoGain.gain.value = 0.15;
+      lfo.connect(lfoGain); lfoGain.connect(out.gain);
+      out.gain.value = 0.3;
+      src.start(); lfo.start();
+
+      const crunch = () => {
+        if (!isPlaying || currentSound !== "snow") return;
+        const crunchSrc = c.createBufferSource();
+        crunchSrc.buffer = noiseBuffer(c, 0.3);
+        const crunchFilter = c.createBiquadFilter();
+        crunchFilter.type = "bandpass";
+        crunchFilter.frequency.value = 800 + Math.random() * 400;
+        crunchFilter.Q.value = 0.7;
+        const crunchGain = c.createGain();
+        crunchGain.gain.value = 0;
+        crunchSrc.connect(crunchFilter); crunchFilter.connect(crunchGain); crunchGain.connect(out);
+        const now = c.currentTime;
+        crunchGain.gain.setValueAtTime(0, now);
+        crunchGain.gain.linearRampToValueAtTime(0.05, now + 0.05);
+        crunchGain.gain.linearRampToValueAtTime(0, now + 0.35);
+        crunchSrc.start(now);
+        crunchSrc.stop(now + 0.4);
+      };
+      scheduledIntervals.push(setInterval(crunch, 9000 + Math.random() * 6000));
+    }
+
+    function buildForest(c, out) {
+      const src = track(c.createBufferSource());
+      src.buffer = noiseBuffer(c, 4);
+      src.loop = true;
+      const hp = track(c.createBiquadFilter()); hp.type = "highpass"; hp.frequency.value = 250;
+      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 2200;
+      src.connect(hp); hp.connect(lp); lp.connect(out);
+      out.gain.value = 0.4;
+      src.start();
+
+      const chirp = () => {
+        if (!isPlaying || currentSound !== "forest") return;
+        const osc = c.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = 1800 + Math.random() * 1400;
+        const g = c.createGain();
+        g.gain.value = 0;
+        osc.connect(g); g.connect(out);
+        const now = c.currentTime;
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(0.06, now + 0.05);
+        g.gain.linearRampToValueAtTime(0, now + 0.22);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      };
+      scheduledIntervals.push(setInterval(chirp, 2800 + Math.random() * 2400));
+    }
+
+    function buildWhite(c, out) {
+      const src = track(c.createBufferSource());
+      src.buffer = noiseBuffer(c, 4);
+      src.loop = true;
+      src.connect(out);
+      out.gain.value = 0.35;
+      src.start();
+    }
+
+    function buildLofi(c, out) {
+      // Soft chord pad (Cmaj7-ish), a slow low "heartbeat" pulse, and a
+      // faint high-passed noise bed for texture — an ambient approximation
+      // rather than an actual beat, kept deliberately mellow.
+      const freqs = [130.8, 164.8, 196.0, 246.9];
+      const padGain = track(c.createGain()); padGain.gain.value = 0.14;
+      const padFilter = track(c.createBiquadFilter()); padFilter.type = "lowpass"; padFilter.frequency.value = 900;
+      padGain.connect(padFilter); padFilter.connect(out);
+      freqs.forEach((f, i) => {
+        const osc = track(c.createOscillator());
+        osc.type = "triangle";
+        osc.frequency.value = f;
+        osc.detune.value = (i - 1.5) * 4;
+        osc.connect(padGain);
+        osc.start();
+      });
+
+      const pulse = () => {
+        if (!isPlaying || currentSound !== "lofi") return;
+        const osc = c.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = 62;
+        const g = c.createGain();
+        g.gain.value = 0;
+        osc.connect(g); g.connect(out);
+        const now = c.currentTime;
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(0.18, now + 0.03);
+        g.gain.linearRampToValueAtTime(0, now + 0.5);
+        osc.start(now);
+        osc.stop(now + 0.55);
+      };
+      pulse();
+      scheduledIntervals.push(setInterval(pulse, 1600));
+
+      const crackle = track(c.createBufferSource());
+      crackle.buffer = noiseBuffer(c, 4);
+      crackle.loop = true;
+      const crackleFilter = track(c.createBiquadFilter()); crackleFilter.type = "highpass"; crackleFilter.frequency.value = 4000;
+      const crackleGain = track(c.createGain()); crackleGain.gain.value = 0.04;
+      crackle.connect(crackleFilter); crackleFilter.connect(crackleGain); crackleGain.connect(out);
+      crackle.start();
+
+      out.gain.value = 1;
+    }
+
+    const BUILDERS = { rain: buildRain, ocean: buildOcean, snow: buildSnow, forest: buildForest, white: buildWhite, lofi: buildLofi };
+
+    function build(type) {
+      const c = ensureCtx();
+      clearNodes();
+      const out = track(c.createGain());
+      out.gain.value = 1;
+      out.connect(masterGain);
+      (BUILDERS[type] || buildWhite)(c, out);
+      currentSound = type;
+    }
+
+    function fadeMasterTo(value, seconds) {
+      const c = ensureCtx();
+      const now = c.currentTime;
+      masterGain.gain.cancelScheduledValues(now);
+      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+      masterGain.gain.linearRampToValueAtTime(value, Math.max(now + 0.05, now + seconds));
+    }
+
+    function clearCountdown() {
+      if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    }
+
+    function startCountdown() {
+      clearCountdown();
+      if (!timerEndsAt) { onStateChange(); return; }
+      countdownInterval = setInterval(() => {
+        const remainingMs = timerEndsAt - Date.now();
+        if (remainingMs <= 0) { stop(); return; }
+        if (remainingMs <= 8000 && isPlaying) fadeMasterTo(0, remainingMs / 1000);
+        onStateChange();
+      }, 1000);
+      onStateChange();
+    }
+
+    function play(type) {
+      if (type) build(type);
+      else if (!currentSound) build(SOUND_PROFILES[0].id);
+      isPlaying = true;
+      fadeMasterTo(targetVolume, 2.5);
+      if (timerMinutes > 0) {
+        timerEndsAt = Date.now() + timerMinutes * 60000;
+        startCountdown();
+      } else {
+        timerEndsAt = null;
+        clearCountdown();
+      }
+      onStateChange();
+    }
+
+    function stop() {
+      fadeMasterTo(0, 1.2);
+      isPlaying = false;
+      clearCountdown();
+      timerEndsAt = null;
+      setTimeout(() => { if (!isPlaying) clearNodes(); }, 1300);
+      onStateChange();
+    }
+
+    function toggle() { isPlaying ? stop() : play(currentSound); }
+
+    function select(type) {
+      if (isPlaying) {
+        fadeMasterTo(0, 0.4);
+        setTimeout(() => play(type), 420);
+      } else {
+        currentSound = type;
+        onStateChange();
+      }
+    }
+
+    function setVolume(v) {
+      targetVolume = v;
+      if (isPlaying) fadeMasterTo(v, 0.3);
+    }
+
+    function setTimer(minutes) {
+      timerMinutes = minutes;
+      if (isPlaying) {
+        if (minutes > 0) {
+          timerEndsAt = Date.now() + minutes * 60000;
+          startCountdown();
+        } else {
+          timerEndsAt = null;
+          clearCountdown();
+          onStateChange();
+        }
+      } else {
+        onStateChange();
+      }
+    }
+
+    function getState() {
+      let remaining = null;
+      if (timerEndsAt) remaining = Math.max(0, Math.round((timerEndsAt - Date.now()) / 1000));
+      return { isPlaying, currentSound, targetVolume, timerMinutes, remaining };
+    }
+
+    return {
+      play, stop, toggle, select, setVolume, setTimer, getState,
+      onChange(fn) { onStateChange = fn; },
+    };
+  })();
+
+  function renderAmbientPanel() {
+    const soundsWrap = $("ambientSounds");
+    soundsWrap.innerHTML = "";
+    SOUND_PROFILES.forEach((s) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip";
+      chip.dataset.sound = s.id;
+      chip.textContent = s.label;
+      chip.addEventListener("click", () => Ambient.select(s.id));
+      soundsWrap.appendChild(chip);
+    });
+
+    const timersWrap = $("ambientTimers");
+    timersWrap.innerHTML = "";
+    TIMER_OPTIONS.forEach((t) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip";
+      chip.dataset.timer = t.id;
+      chip.textContent = t.label;
+      chip.addEventListener("click", () => Ambient.setTimer(t.id));
+      timersWrap.appendChild(chip);
+    });
+  }
+
+  function formatCountdown(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  function updateAmbientUI() {
+    const state = Ambient.getState();
+    $("ambientSounds").querySelectorAll(".chip").forEach((chip) => {
+      chip.classList.toggle("active", chip.dataset.sound === state.currentSound);
+    });
+    $("ambientTimers").querySelectorAll(".chip").forEach((chip) => {
+      chip.classList.toggle("active", Number(chip.dataset.timer) === state.timerMinutes);
+    });
+    $("ambientPlayBtn").textContent = state.isPlaying ? "⏸ 暂停 Pause" : "▶️ 播放 Play";
+    const countdown = $("ambientCountdown");
+    if (state.isPlaying && state.remaining != null) {
+      countdown.textContent = `剩余 ${formatCountdown(state.remaining)} remaining`;
+    } else if (state.isPlaying) {
+      countdown.textContent = "播放中（无时间限制）/ Playing (no timer)";
+    } else {
+      countdown.textContent = "";
+    }
+  }
+
+  Ambient.onChange(updateAmbientUI);
+
+  $("ambientToggle").addEventListener("click", () => {
+    const panel = $("ambientPanel");
+    if (panel.classList.contains("open")) {
+      panel.classList.remove("open");
+    } else {
+      panel.classList.add("open");
+      $("settingsPanel").classList.remove("open");
+      panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  });
+  $("ambientPlayBtn").addEventListener("click", () => Ambient.toggle());
+  $("ambientVolume").addEventListener("input", (e) => Ambient.setVolume(Number(e.target.value) / 100));
+
+  function playAmbientFromSuggestion(type) {
+    $("ambientPanel").classList.add("open");
+    $("settingsPanel").classList.remove("open");
+    Ambient.play(type);
+    $("ambientPanel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  // ---------------------------------------------------------------------
+  // Voice input (Web Speech API) — hold the 🎤 button, or hold Space when
+  // focus isn't in a text field, to talk. Release to stop recording — the
+  // transcript is left in the box for you to review/edit; it never
+  // auto-submits. You always click Send/Just say it yourself.
+  // ---------------------------------------------------------------------
+
+  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const VOICE_SUPPORTED = !!SpeechRecognitionCtor;
+
+  function createVoiceController({ micBtn, statusEl, textarea }) {
+    if (!VOICE_SUPPORTED) {
+      micBtn.disabled = true;
+      micBtn.title = "该浏览器不支持语音输入 / Voice input not supported in this browser";
+      return { start() {}, stop() {}, isRecording: () => false };
+    }
+
+    let recognition = null;
+    let recording = false;
+    let finalTranscript = "";
+    let baseValue = "";
+
+    // Fully detach an instance's handlers and stop it. Reusing or
+    // restarting a SpeechRecognition object after it has ended is
+    // unreliable across browsers (Chrome/Safari throw "aborted" on the
+    // next start()) — every listening session gets its own instance.
+    function teardown(instance) {
+      if (!instance) return;
+      instance.onresult = null;
+      instance.onerror = null;
+      instance.onend = null;
+      try { instance.stop(); } catch { /* noop */ }
+    }
+
+    function launchInstance() {
+      recognition = new SpeechRecognitionCtor();
+      recognition.lang = getMicLang();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        let interim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) finalTranscript += transcript;
+          else interim += transcript;
+        }
+        textarea.value = baseValue + finalTranscript + interim;
+      };
+
+      recognition.onerror = (event) => {
+        // "aborted" / "no-speech" fire routinely when we stop or restart
+        // recognition ourselves — not a real problem, so don't surface them.
+        if (event.error === "aborted" || event.error === "no-speech") return;
+        statusEl.textContent = event.error === "not-allowed"
+          ? "麦克风权限被拒绝 / Microphone permission denied"
+          : `识别出错 Voice error: ${event.error}`;
+      };
+
+      recognition.onend = () => {
+        recognition = null;
+        if (recording) {
+          // Ended on its own (e.g. a pause in speech) while still held —
+          // spin up a fresh instance rather than restarting this one.
+          launchInstance();
+        }
+      };
+
+      try { recognition.start(); } catch { /* noop — starting too soon after a previous instance */ }
+    }
+
+    function start() {
+      if (recording) return;
+      // Guarantee any leftover instance from a previous press is fully
+      // stopped before spinning up a new one.
+      teardown(recognition);
+      recognition = null;
+
+      recording = true;
+      finalTranscript = "";
+      baseValue = textarea.value ? textarea.value + " " : "";
+      micBtn.classList.add("recording");
+      statusEl.textContent = "🔴 正在聆听… Listening…";
+      launchInstance();
+    }
+
+    function stop() {
+      if (!recording) return;
+      recording = false;
+      micBtn.classList.remove("recording");
+      statusEl.textContent = "";
+      teardown(recognition);
+      recognition = null;
+      // Leave the transcript in the box for review — never auto-submit.
+      textarea.focus();
+    }
+
+    const startPress = (e) => { e.preventDefault(); start(); };
+    micBtn.addEventListener("mousedown", startPress);
+    micBtn.addEventListener("touchstart", startPress, { passive: false });
+    micBtn.addEventListener("touchend", stop);
+    document.addEventListener("mouseup", () => { if (recording) stop(); });
+
+    return { start, stop, isRecording: () => recording };
+  }
+
+  const taskVoice = createVoiceController({
+    micBtn: $("taskMicBtn"),
+    statusEl: $("taskMicStatus"),
+    textarea: $("taskInput"),
+  });
+
+  const replyVoice = createVoiceController({
+    micBtn: $("replyMicBtn"),
+    statusEl: $("replyMicStatus"),
+    textarea: $("replyInput"),
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.code !== "Space" || e.repeat) return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === "TEXTAREA" || tag === "INPUT") return; // let normal typing happen
+    e.preventDefault();
+    (($("chatArea").classList.contains("open")) ? replyVoice : taskVoice).start();
+  });
+  document.addEventListener("keyup", (e) => {
+    if (e.code !== "Space") return;
+    (($("chatArea").classList.contains("open")) ? replyVoice : taskVoice).stop();
+  });
+
+  // ---------------------------------------------------------------------
+  // API call
+  // ---------------------------------------------------------------------
+
+  function showError(msg) {
+    const box = $("errorBox");
+    box.textContent = msg;
+    box.classList.add("visible");
+  }
+
+  function hideError() {
+    $("errorBox").classList.remove("visible");
+  }
+
+  async function callClaude(messages) {
+    const apiKey = localStorage.getItem(STORAGE_KEYS.apiKey) || "";
+    if (!apiKey) {
+      throw new Error("请先在设置中填入 Anthropic API Key。/ Please add your Anthropic API key in Settings first.");
+    }
+    const systemPrompt = localStorage.getItem(STORAGE_KEYS.systemPrompt) || DEFAULT_SYSTEM_PROMPT;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1200,
+        system: systemPrompt,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      }),
+    });
+
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const errJson = await response.json();
+        detail = errJson?.error?.message || "";
+      } catch { /* ignore parse failure */ }
+
+      if (response.status === 401) {
+        throw new Error("API Key 无效，请检查设置。/ Invalid API key — please check Settings.");
+      }
+      if (response.status === 429) {
+        throw new Error("请求太频繁了，稍等一下再试。/ Rate limited — please wait a moment and try again.");
+      }
+      throw new Error(`请求失败 Request failed (${response.status})${detail ? ": " + detail : ""}`);
+    }
+
+    const data = await response.json();
+    const textBlock = (data.content || []).find((b) => b.type === "text");
+    if (!textBlock) throw new Error("没有收到有效回复。/ No text response received.");
+    return textBlock.text;
+  }
+
+  // ---------------------------------------------------------------------
+  // Conversation — multi-turn back-and-forth, not one-shot.
+  // ---------------------------------------------------------------------
+
+  let conversation = []; // { role: "user" | "assistant", content: string }
+  let emailOffered = false; // whether the email-paste box has been revealed this conversation
+  let pendingTask = ""; // task text captured before the quadrant step
+
+  function isFinalTurn(text) {
+    return /试试这个|try this\s*:?/i.test(text);
+  }
+
+  function mentionsEmail(text) {
+    return /邮件|email/i.test(text);
+  }
+
+  function maybeOfferEmailInline(text) {
+    if (emailOffered || !mentionsEmail(text)) return;
+    emailOffered = true;
+    $("emailInlineBox").classList.add("visible");
+  }
+
+  function addUserBubble(text) {
+    const thread = $("chatThread");
+    const div = document.createElement("div");
+    div.className = "bubble bubble-user";
+    div.textContent = text;
+    thread.appendChild(div);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function addTypingBubble() {
+    const thread = $("chatThread");
+    const div = document.createElement("div");
+    div.className = "bubble-typing";
+    div.id = "typingBubble";
+    div.innerHTML = "<span></span><span></span><span></span>";
+    thread.appendChild(div);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function removeTypingBubble() {
+    const el = $("typingBubble");
+    if (el) el.remove();
+  }
+
+  // Pull one heading's raw text out of a full assistant reply — used both
+  // for the "回复草稿" copy button and for extracting "卡住的原因" (the
+  // blocker) to save in history. headingTest receives the raw heading text.
+  function extractSection(text, headingTest) {
+    const lines = text.split("\n");
+    let capturing = false;
+    const out = [];
+    for (const raw of lines) {
+      const line = raw.trim();
+      const headingMatch = line.match(/^\*\*(.+?)\*\*\s*:?\s*$/);
+      if (headingMatch) {
+        if (headingTest(headingMatch[1])) {
+          capturing = true;
+        } else if (capturing) {
+          break; // hit the next heading — stop
+        }
+        continue;
+      }
+      if (capturing) out.push(raw);
+    }
+    while (out.length && !out[0].trim()) out.shift();
+    while (out.length && !out[out.length - 1].trim()) out.pop();
+    return out.join("\n").trim();
+  }
+
+  function extractDraftReply(text) {
+    return extractSection(text, (h) => /回复草稿|draft reply/i.test(h));
+  }
+
+  function extractBlockerReason(text) {
+    return extractSection(text, (h) => /卡住的原因|what's blocking you/i.test(h));
+  }
+
+  function stripInlineMarkdown(str) {
+    return str.replace(/\*\*(.+?)\*\*/g, "$1");
+  }
+
+  function fallbackCopy(text) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
+  function getOutlookUrl() {
+    const custom = settings.quickLinks.find((l) => /outlook/i.test(l.name));
+    return custom ? custom.url : "https://outlook.office.com";
+  }
+
+  async function copyDraftToOutlook(draftText, noteEl) {
+    const plain = stripInlineMarkdown(draftText);
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(plain);
+      copied = true;
+    } catch {
+      copied = fallbackCopy(plain);
+    }
+    window.open(getOutlookUrl(), "_blank", "noopener,noreferrer");
+    noteEl.textContent = copied
+      ? "已复制草稿，请在 Outlook 中粘贴。记得检查后再发送！/ Draft copied. Paste in Outlook — review before sending!"
+      : "打开了 Outlook，但复制失败，请手动复制草稿。/ Opened Outlook, but copying failed — please copy the draft manually.";
+  }
+
+  function addAssistantBubble(text) {
+    maybeOfferEmailInline(text);
+
+    const thread = $("chatThread");
+    const div = document.createElement("div");
+    div.className = "bubble bubble-assistant";
+    div.innerHTML = renderLite(text);
+
+    if (isFinalTurn(text)) {
+      // Ambient-sound suggestion, right where the action was just given.
+      const suggest = document.createElement("div");
+      suggest.className = "ambient-suggest";
+      suggest.innerHTML = `🎧 放点声音帮自己开始？/ Want some sound to ease in?
+        <div class="presets">
+          ${SOUND_PROFILES.map((s) => `<button type="button" class="chip" data-suggest-sound="${s.id}">${s.label}</button>`).join("")}
+        </div>`;
+      suggest.querySelectorAll("[data-suggest-sound]").forEach((btn) => {
+        btn.addEventListener("click", () => playAmbientFromSuggestion(btn.dataset.suggestSound));
+      });
+      div.appendChild(suggest);
+
+      // Draft reply present — offer to copy it and open Outlook. Never
+      // sends anything automatically; the user pastes and reviews.
+      const draftReply = extractDraftReply(text);
+      if (draftReply) {
+        const draftRow = document.createElement("div");
+        draftRow.className = "draft-actions";
+        const copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "secondary";
+        copyBtn.textContent = "📋 复制到 Outlook Copy to Outlook";
+        const draftNote = document.createElement("div");
+        draftNote.className = "draft-copy-note";
+        copyBtn.addEventListener("click", () => copyDraftToOutlook(draftReply, draftNote));
+        draftRow.appendChild(copyBtn);
+        draftRow.appendChild(draftNote);
+        div.appendChild(draftRow);
+      }
+
+      // If this turn is about an email, surface the matching quick-launch
+      // link(s) right here instead of making you scroll to Quick Launch.
+      if (emailOffered || mentionsEmail(text)) {
+        const emailLinks = settings.quickLinks.filter((l) => /gmail|outlook|mail/i.test(l.name));
+        if (emailLinks.length) {
+          const actions = document.createElement("div");
+          actions.className = "inline-actions";
+          actions.innerHTML = emailLinks
+            .map((l) => `<a class="launch-link" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">📮 打开 Open ${escapeHtml(l.name)}</a>`)
+            .join("");
+          div.appendChild(actions);
+        }
+      }
+
+      $("completionRow").classList.add("visible");
+    }
+
+    thread.appendChild(div);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  async function sendConversationTurn() {
+    hideError();
+    addTypingBubble();
+    $("replySendBtn").disabled = true;
+    $("submitBtn").disabled = true;
+    try {
+      const reply = await callClaude(conversation);
+      conversation.push({ role: "assistant", content: reply });
+      removeTypingBubble();
+      addAssistantBubble(reply);
+    } catch (err) {
+      removeTypingBubble();
+      showError(err.message || String(err));
+    } finally {
+      $("replySendBtn").disabled = false;
+      $("submitBtn").disabled = false;
+    }
+  }
+
+  function resetCompletionUI() {
+    $("completionRow").classList.remove("visible");
+    $("completedBtn").disabled = false;
+    $("completedBtn").textContent = "我做到了 ✓ I did it";
+    $("completionMessage").textContent = "";
+  }
+
+  // ---------------------------------------------------------------------
+  // Conversation history — saved to localStorage when a session ends
+  // (clicking "我做到了", clicking "Start over", or closing the tab).
+  // ---------------------------------------------------------------------
+
+  const HISTORY_LIMIT = 200;
+
+  let currentSessionId = null; // set when a conversation starts, cleared on reset
+  let currentSessionMeta = null; // { task, quadrant, startedAt }
+  let currentSessionCompleted = false;
+
+  function categorizeBlocker(text) {
+    if (!text) return null;
+    for (const cat of BLOCKER_CATEGORIES) {
+      if (cat.pattern.test(text)) return cat;
+    }
+    return { id: "other", zh: "其他", en: "Other" };
+  }
+
+  function loadHistory() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEYS.history));
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveHistoryList(list) {
+    localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(list.slice(0, HISTORY_LIMIT)));
+  }
+
+  function findBlockerInConversation(convo) {
+    for (let i = convo.length - 1; i >= 0; i--) {
+      if (convo[i].role === "assistant" && isFinalTurn(convo[i].content)) {
+        const blocker = extractBlockerReason(convo[i].content);
+        if (blocker) return blocker;
+      }
+    }
+    return null;
+  }
+
+  function saveCurrentSession(completed) {
+    if (!currentSessionId || conversation.length === 0) return;
+    const history = loadHistory();
+    const idx = history.findIndex((h) => h.id === currentSessionId);
+    const record = {
+      id: currentSessionId,
+      startedAt: currentSessionMeta.startedAt,
+      updatedAt: new Date().toISOString(),
+      task: currentSessionMeta.task,
+      quadrant: currentSessionMeta.quadrant,
+      messages: conversation.map((m) => ({ role: m.role, content: m.content })),
+      completed,
+      blocker: findBlockerInConversation(conversation),
+    };
+    if (idx >= 0) history[idx] = record;
+    else history.unshift(record);
+    saveHistoryList(history);
+  }
+
+  function startOfWeek(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const day = d.getDay(); // 0 = Sunday
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    d.setDate(d.getDate() - diffToMonday);
+    return d;
+  }
+
+  function formatHistoryDate(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    const sameYear = d.getFullYear() === now.getFullYear();
+    const opts = sameYear
+      ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
+      : { year: "numeric", month: "short", day: "numeric" };
+    return d.toLocaleString(getMicLang().startsWith("zh") ? "zh-CN" : "en-US", opts);
+  }
+
+  function renderHistoryStats(history) {
+    const wrap = $("historyStats");
+    if (!history.length) {
+      wrap.innerHTML = `<div>还没有记录，聊完第一次之后就会出现在这里。/ No history yet — it'll show up after your first conversation.</div>`;
+      return;
+    }
+
+    const weekStart = startOfWeek(new Date());
+    const thisWeekCount = history.filter((h) => new Date(h.startedAt) >= weekStart).length;
+
+    const quadrantCounts = {};
+    history.forEach((h) => {
+      if (h.quadrant) quadrantCounts[h.quadrant.id] = (quadrantCounts[h.quadrant.id] || 0) + 1;
+    });
+    let topQuadrantId = null;
+    Object.keys(quadrantCounts).forEach((id) => {
+      if (!topQuadrantId || quadrantCounts[id] > quadrantCounts[topQuadrantId]) topQuadrantId = id;
+    });
+    const topQuadrant = topQuadrantId ? QUADRANTS.find((q) => q.id === topQuadrantId) : null;
+
+    const blockerCounts = {};
+    history.forEach((h) => {
+      const cat = categorizeBlocker(h.blocker);
+      if (!cat) return;
+      blockerCounts[cat.id] = blockerCounts[cat.id] || { cat, count: 0 };
+      blockerCounts[cat.id].count++;
+    });
+    let topBlocker = null;
+    Object.values(blockerCounts).forEach((entry) => {
+      if (!topBlocker || entry.count > topBlocker.count) topBlocker = entry;
+    });
+
+    const lines = [];
+    lines.push(`<div>📅 本周开始了 <strong>${thisWeekCount}</strong> 件事 / <strong>${thisWeekCount}</strong> thing${thisWeekCount === 1 ? "" : "s"} started this week</div>`);
+    if (topQuadrant) {
+      lines.push(`<div>${topQuadrant.emoji} 最常选的象限 Most picked quadrant: ${topQuadrant.zh} / ${topQuadrant.en}</div>`);
+    }
+    if (topBlocker) {
+      lines.push(`<div>💭 最常见的卡点 Most common blocker: ${topBlocker.cat.zh} / ${topBlocker.cat.en}</div>`);
+    }
+    wrap.innerHTML = lines.join("");
+  }
+
+  function attachSwipeToDelete(itemEl, onDelete) {
+    let startX = null;
+    let currentX = 0;
+    const threshold = -70;
+    itemEl.addEventListener("touchstart", (e) => {
+      startX = e.touches[0].clientX;
+      itemEl.style.transition = "none";
+    }, { passive: true });
+    itemEl.addEventListener("touchmove", (e) => {
+      if (startX == null) return;
+      currentX = Math.min(0, e.touches[0].clientX - startX);
+      itemEl.style.transform = `translateX(${currentX}px)`;
+    }, { passive: true });
+    itemEl.addEventListener("touchend", () => {
+      itemEl.style.transition = "transform 0.2s";
+      if (currentX < threshold) {
+        itemEl.style.transform = "translateX(-100%)";
+        setTimeout(onDelete, 180);
+      } else {
+        itemEl.style.transform = "";
+      }
+      startX = null;
+      currentX = 0;
+    });
+  }
+
+  function deleteHistoryItem(id) {
+    saveHistoryList(loadHistory().filter((h) => h.id !== id));
+    renderHistoryList();
+  }
+
+  function openHistoryDetail(record) {
+    const thread = $("historyDetailThread");
+    thread.innerHTML = "";
+    record.messages.forEach((m) => {
+      const div = document.createElement("div");
+      div.className = m.role === "user" ? "bubble bubble-user" : "bubble bubble-assistant";
+      if (m.role === "user") div.textContent = m.content;
+      else div.innerHTML = renderLite(m.content);
+      thread.appendChild(div);
+    });
+    $("historyDetailMeta").textContent = [
+      formatHistoryDate(record.startedAt),
+      record.quadrant ? `${record.quadrant.emoji} ${record.quadrant.zh}` : null,
+      record.completed ? "✅ 完成 Completed" : "⏸ 未完成 Unfinished",
+    ].filter(Boolean).join(" · ");
+    $("historyList").style.display = "none";
+    $("historyStats").style.display = "none";
+    $("historyDetail").classList.add("open");
+  }
+
+  function renderHistoryList() {
+    const history = loadHistory();
+    renderHistoryStats(history);
+
+    const list = $("historyList");
+    list.innerHTML = "";
+
+    if (!history.length) {
+      list.innerHTML = `<div class="history-empty">还没有对话记录。/ No conversations yet.</div>`;
+      return;
+    }
+
+    history.forEach((record) => {
+      const item = document.createElement("div");
+      item.className = "history-item";
+      const preview = `${record.quadrant ? record.quadrant.emoji + " " : ""}${record.task}`;
+      item.innerHTML = `
+        <div class="history-item-top">
+          <span class="history-item-date">${escapeHtml(formatHistoryDate(record.startedAt))}</span>
+          <span class="history-item-status">${record.completed ? "✅" : "⏸"}</span>
+        </div>
+        <div class="history-item-preview">${escapeHtml(preview)}</div>
+        <button type="button" class="history-item-delete" title="删除 Delete">🗑</button>
+      `;
+      item.addEventListener("click", (e) => {
+        if (e.target.closest(".history-item-delete")) return;
+        openHistoryDetail(record);
+      });
+      item.querySelector(".history-item-delete").addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteHistoryItem(record.id);
+      });
+      attachSwipeToDelete(item, () => deleteHistoryItem(record.id));
+      list.appendChild(item);
+    });
+  }
+
+  function openHistoryDrawer() {
+    $("historyDetail").classList.remove("open");
+    $("historyList").style.display = "";
+    $("historyStats").style.display = "";
+    renderHistoryList();
+    $("historyDrawer").classList.add("open");
+    $("historyBackdrop").classList.add("open");
+  }
+
+  function closeHistoryDrawer() {
+    $("historyDrawer").classList.remove("open");
+    $("historyBackdrop").classList.remove("open");
+  }
+
+  $("historyToggle").addEventListener("click", openHistoryDrawer);
+  $("historyCloseBtn").addEventListener("click", closeHistoryDrawer);
+  $("historyBackdrop").addEventListener("click", closeHistoryDrawer);
+  $("historyBackBtn").addEventListener("click", () => {
+    $("historyDetail").classList.remove("open");
+    $("historyList").style.display = "";
+    $("historyStats").style.display = "";
+  });
+  $("clearHistoryBtn").addEventListener("click", () => {
+    if (confirm("确定要清除全部历史记录吗？此操作无法撤销。\nClear all history? This cannot be undone.")) {
+      saveHistoryList([]);
+      renderHistoryList();
+    }
+  });
+
+  window.addEventListener("beforeunload", () => {
+    if (currentSessionId && conversation.length > 0) saveCurrentSession(currentSessionCompleted);
+  });
+
+  // Step 1: capture the task, then show the Eisenhower quadrant picker
+  // instead of sending straight to the AI.
+  function showQuadrantStep() {
+    const task = $("taskInput").value.trim();
+    if (!task) {
+      showError("先写一句你在逃避的事情吧。/ Describe what you're avoiding first.");
+      return;
+    }
+    hideError();
+    pendingTask = task;
+    $("quadrantRecap").textContent = `「${task}」`;
+    $("taskStep").style.display = "none";
+    $("quadrantStep").style.display = "block";
+  }
+
+  // Step 2: quadrant chosen (or skipped) — actually start the conversation.
+  function startConversation(task, quadrant) {
+    let content = `我在逃避的事情/感受：\n${task}`;
+    if (quadrant) {
+      content += `\n\n[优先级象限 / Priority quadrant: ${quadrant.zh} / ${quadrant.en}]`;
+    }
+    conversation = [{ role: "user", content }];
+    emailOffered = false;
+
+    currentSessionId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    currentSessionMeta = { task, quadrant, startedAt: new Date().toISOString() };
+    currentSessionCompleted = false;
+
+    $("quadrantStep").style.display = "none";
+    $("starterForm").style.display = "none";
+    $("chatArea").classList.add("open");
+    $("chatThread").innerHTML = "";
+    resetCompletionUI();
+    $("emailInlineBox").classList.remove("visible");
+    $("emailInlineInput").value = "";
+
+    let displayText = task;
+    if (quadrant) displayText += `\n\n${quadrant.emoji} ${quadrant.zh} / ${quadrant.en}`;
+    addUserBubble(displayText);
+
+    sendConversationTurn();
+  }
+
+  function continueConversation() {
+    const text = $("replyInput").value.trim();
+    const emailBox = $("emailInlineInput");
+    const emailText = emailBox.value.trim();
+    if (!text && !emailText) return;
+
+    let content = text;
+    let displayText = text;
+    if (emailText) {
+      content += (content ? "\n\n" : "") + `我需要回复的邮件原文：\n"""\n${emailText}\n"""`;
+      displayText += (displayText ? "\n\n" : "") + "📧 [附上了邮件原文 / pasted an email]";
+      emailBox.value = "";
+      $("emailInlineBox").classList.remove("visible");
+    }
+
+    conversation.push({ role: "user", content });
+    addUserBubble(displayText);
+    $("replyInput").value = "";
+    sendConversationTurn();
+  }
+
+  $("submitBtn").addEventListener("click", showQuadrantStep);
+  $("taskInput").addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") showQuadrantStep();
+  });
+
+  document.querySelectorAll(".quadrant-cell").forEach((cell) => {
+    cell.addEventListener("click", () => {
+      const quadrant = QUADRANTS.find((q) => q.id === cell.dataset.quadrant);
+      startConversation(pendingTask, quadrant);
+    });
+  });
+  $("quadrantSkip").addEventListener("click", () => startConversation(pendingTask, null));
+  $("quadrantEditBtn").addEventListener("click", () => {
+    $("quadrantStep").style.display = "none";
+    $("taskStep").style.display = "";
+    $("taskInput").focus();
+  });
+
+  $("replySendBtn").addEventListener("click", continueConversation);
+  $("replyInput").addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") continueConversation();
+  });
+
+  $("completedBtn").addEventListener("click", () => {
+    const count = bumpCompletionCount();
+    renderStreak();
+    $("completedBtn").disabled = true;
+    $("completedBtn").textContent = "✓ 已完成 Logged";
+    const msg = COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)];
+    $("completionMessage").textContent = msg;
+    Celebration.play();
+    launchConfetti();
+    currentSessionCompleted = true;
+    saveCurrentSession(true);
+    if ($("historyDrawer").classList.contains("open")) renderHistoryList();
+  });
+
+  $("startOverBtn").addEventListener("click", () => {
+    if (currentSessionId) saveCurrentSession(currentSessionCompleted);
+    conversation = [];
+    emailOffered = false;
+    pendingTask = "";
+    currentSessionId = null;
+    currentSessionMeta = null;
+    currentSessionCompleted = false;
+    $("chatThread").innerHTML = "";
+    $("chatArea").classList.remove("open");
+    $("starterForm").style.display = "";
+    $("taskStep").style.display = "";
+    $("quadrantStep").style.display = "none";
+    $("taskInput").value = "";
+    $("emailInlineInput").value = "";
+    $("emailInlineBox").classList.remove("visible");
+    resetCompletionUI();
+    hideError();
+    $("taskInput").focus();
+  });
+
+  // ---------------------------------------------------------------------
+  // Init
+  // ---------------------------------------------------------------------
+
+  renderQuickLinks();
+  renderTemplateCards();
+  renderAmbientPanel();
+  renderMicLangOptions();
+  Ambient.select(SOUND_PROFILES[0].id);
+  renderStreak();
+
+  if (!localStorage.getItem(STORAGE_KEYS.apiKey)) {
+    setTimeout(() => {
+      showError("欢迎使用！先点右上角 ⚙️ 设置你的 API Key。/ Welcome! Click ⚙️ in the top right to add your API key first.");
+    }, 300);
+  }
+})();
+</script>
+</body>
+</html>
