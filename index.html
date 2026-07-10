@@ -1447,16 +1447,20 @@
         masterGain.gain.value = 0;
         masterGain.connect(ctx.destination);
       }
-      if (ctx.state === "suspended") {
-        // Must be called synchronously from inside the user-gesture click
-        // handler (it is — ensureCtx is only ever invoked from play(),
-        // which is only ever invoked from a click listener). The unlock
-        // itself resolves asynchronously; surface it if it ever fails
-        // instead of leaving the user staring at silence with no clue why.
-        ctx.resume().catch((err) => {
-          showError(`无法启动音频，请再点一次播放。/ Couldn't start audio — try pressing Play again. (${err && err.message ? err.message : err})`);
-        });
-      }
+      // Always call resume(), not just when state === "suspended": iOS
+      // Safari (and GitHub's in-app WKWebView browser especially) has been
+      // seen reporting state as "running" immediately after construction
+      // while the context is still gesture-locked underneath, so gating on
+      // the state check can skip the unlock entirely. Calling resume() on
+      // an already-running context is a harmless no-op. Must stay
+      // synchronous inside the user-gesture click handler (it is —
+      // ensureCtx is only ever invoked from play(), which is only ever
+      // invoked from a click listener); the unlock itself resolves
+      // asynchronously, so surface a failure instead of leaving the user
+      // staring at silence with no clue why.
+      ctx.resume().catch((err) => {
+        showError(`无法启动音频，请再点一次播放。/ Couldn't start audio — try pressing Play again. (${err && err.message ? err.message : err})`);
+      });
       return ctx;
     }
 
