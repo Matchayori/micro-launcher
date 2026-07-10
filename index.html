@@ -1014,6 +1014,7 @@
     { id: "lofi", label: "🎵 Lo-fi" },
     { id: "forest", label: "🌲 森林 Forest" },
     { id: "white", label: "⚪ 白噪音 White noise" },
+    { id: "bowl", label: "🔔 颂钵 Singing bowl" },
   ];
 
   const TIMER_OPTIONS = [
@@ -1652,7 +1653,81 @@
       out.gain.value = 1;
     }
 
-    const BUILDERS = { rain: buildRain, ocean: buildOcean, snow: buildSnow, forest: buildForest, white: buildWhite, lofi: buildLofi };
+    function buildSingingBowl(c, out) {
+      // Three sine "bowl" tones (528 / 396 / 639 Hz) that each breathe in
+      // and out on their own slow cycle — different swell rates so the
+      // three never quite sync, plus a gentle pitch vibrato — and a low
+      // 136Hz "Om" drone underneath as a steady, warm foundation.
+      const bowlTones = [
+        { freq: 528, swellRate: 0.045, peak: 0.17 },
+        { freq: 396, swellRate: 0.035, peak: 0.14 },
+        { freq: 639, swellRate: 0.052, peak: 0.12 },
+      ];
+
+      bowlTones.forEach(({ freq, swellRate, peak }) => {
+        const osc = track(c.createOscillator());
+        osc.type = "sine";
+        osc.frequency.value = freq;
+
+        // Gentle vibrato — a couple of Hz of slow pitch wobble, not a wide
+        // warble, so it reads as a hand-struck bowl rather than a synth.
+        const vibrato = track(c.createOscillator());
+        vibrato.type = "sine";
+        vibrato.frequency.value = 0.15 + Math.random() * 0.1;
+        const vibratoGain = track(c.createGain());
+        vibratoGain.gain.value = 1.5 + Math.random();
+        vibrato.connect(vibratoGain); vibratoGain.connect(osc.frequency);
+
+        // Slow fade-in/fade-out: a sine LFO modulating this tone's own gain
+        // between silence and its peak, on its own unhurried cycle.
+        const toneGain = track(c.createGain());
+        const base = peak / 2;
+        toneGain.gain.value = base;
+        osc.connect(toneGain); toneGain.connect(out);
+
+        const swellLfo = track(c.createOscillator());
+        swellLfo.type = "sine";
+        swellLfo.frequency.value = swellRate;
+        const swellDepth = track(c.createGain());
+        swellDepth.gain.value = base;
+        swellLfo.connect(swellDepth); swellDepth.connect(toneGain.gain);
+
+        osc.start(); vibrato.start(); swellLfo.start();
+      });
+
+      // Low 136Hz Om drone underneath, with a whisper of its octave for
+      // warmth and a very slow, shallow swell — steady enough to read as
+      // a foundation rather than another moving layer.
+      const drone = track(c.createOscillator());
+      drone.type = "sine";
+      drone.frequency.value = 136;
+      const droneOvertone = track(c.createOscillator());
+      droneOvertone.type = "sine";
+      droneOvertone.frequency.value = 136 * 2;
+      const droneOvertoneGain = track(c.createGain());
+      droneOvertoneGain.gain.value = 0.06;
+      droneOvertone.connect(droneOvertoneGain);
+
+      const droneGain = track(c.createGain());
+      const droneBase = 0.24;
+      droneGain.gain.value = droneBase;
+      drone.connect(droneGain);
+      droneOvertoneGain.connect(droneGain);
+      droneGain.connect(out);
+
+      const droneSwellLfo = track(c.createOscillator());
+      droneSwellLfo.type = "sine";
+      droneSwellLfo.frequency.value = 0.025;
+      const droneSwellDepth = track(c.createGain());
+      droneSwellDepth.gain.value = droneBase * 0.3;
+      droneSwellLfo.connect(droneSwellDepth); droneSwellDepth.connect(droneGain.gain);
+
+      drone.start(); droneOvertone.start(); droneSwellLfo.start();
+
+      out.gain.value = 1;
+    }
+
+    const BUILDERS = { rain: buildRain, ocean: buildOcean, snow: buildSnow, forest: buildForest, white: buildWhite, lofi: buildLofi, bowl: buildSingingBowl };
 
     function build(type) {
       const c = ensureCtx();
