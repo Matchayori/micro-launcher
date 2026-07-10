@@ -1283,19 +1283,44 @@
   }
 
   // ---------------------------------------------------------------------
+  // Shared AudioContext — Celebration, Ambient, and the singing-bowl
+  // strike used to each keep their own independent AudioContext. Safari
+  // has been seen behaving unpredictably — working sometimes, silently
+  // producing nothing other times — once more than one AudioContext is
+  // alive on the page at once, so all three now share a single context,
+  // unlocked once and reused everywhere instead of three separate ones
+  // competing for the same audio hardware.
+  // ---------------------------------------------------------------------
+
+  const SharedAudio = (() => {
+    let ctx = null;
+
+    function ensureCtx() {
+      if (ctx && ctx.state === "closed") {
+        // Mobile Safari can kill the context after the tab is backgrounded
+        // (screen lock, app switch, phone call) — reusing a dead context
+        // means every future sound silently does nothing forever, so
+        // start fresh instead of trying to resume a closed one.
+        ctx = null;
+      }
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state !== "running") {
+        ctx.resume().catch((err) => {
+          showError(`无法启动音频，请再试一次。/ Couldn't start audio — please try again. (${err && err.message ? err.message : err})`);
+        });
+      }
+      return ctx;
+    }
+
+    return { ensureCtx };
+  })();
+
+  // ---------------------------------------------------------------------
   // Celebration — a one-shot chime + applause (Web Audio API, no audio
   // files) plus a confetti burst, played when "我做到了" is clicked.
   // ---------------------------------------------------------------------
 
   const Celebration = (() => {
-    let ctx = null;
-
-    function ensureCtx() {
-      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if (ctx.state === "suspended") ctx.resume();
-      return ctx;
-    }
-
     function noiseBuffer(c, seconds) {
       const len = Math.floor(c.sampleRate * seconds);
       const buffer = c.createBuffer(1, len, c.sampleRate);
@@ -1364,7 +1389,7 @@
     }
 
     function play() {
-      const c = ensureCtx();
+      const c = SharedAudio.ensureCtx();
       const now = c.currentTime + 0.02;
       playChime(c, now);
       playApplause(c, now + 0.15, 1.6);
@@ -1455,7 +1480,6 @@
   // ---------------------------------------------------------------------
 
   const Ambient = (() => {
-    let ctx = null;
     let masterGain = null;
     let activeNodes = [];
     let scheduledIntervals = [];
@@ -1468,37 +1492,16 @@
     let onStateChange = () => {};
 
     function ensureCtx() {
-      if (ctx && ctx.state === "closed") {
-        // Mobile Safari can kill the context after the tab is backgrounded
-        // (screen lock, app switch, phone call) — reusing a dead context
-        // means every future play() silently does nothing forever, so
-        // start fresh instead of trying to resume a closed one.
-        ctx = null;
-      }
-      if (!ctx) {
-        ctx = new (window.AudioContext || window.webkitAudioContext)();
-        masterGain = ctx.createGain();
+      const c = SharedAudio.ensureCtx();
+      // masterGain must live on whatever the current shared context is —
+      // recreate it if this is the first call, or if the shared context
+      // was replaced underneath us (e.g. recovered from being closed).
+      if (!masterGain || masterGain.context !== c) {
+        masterGain = c.createGain();
         masterGain.gain.value = 0;
-        masterGain.connect(ctx.destination);
+        masterGain.connect(c.destination);
       }
-      // Resume whenever the context isn't confirmed running (covers the
-      // normal "suspended" case, plus any state iOS Safari might misreport
-      // right after construction). ensureCtx() is called far more often
-      // than just once per play — every volume-slider drag and every
-      // countdown tick calls it via fadeMasterTo() — so calling resume()
-      // unconditionally on every one of those was itself causing
-      // intermittent playback glitches on Safari; only call it when there's
-      // actually something to unlock. Must stay synchronous inside the
-      // user-gesture click handler for the initial unlock (it is —
-      // ensureCtx is invoked from play(), invoked from a click listener);
-      // the unlock resolves asynchronously, so surface a failure instead of
-      // leaving the user staring at silence with no clue why.
-      if (ctx.state !== "running") {
-        ctx.resume().catch((err) => {
-          showError(`无法启动音频，请再点一次播放。/ Couldn't start audio — try pressing Play again. (${err && err.message ? err.message : err})`);
-        });
-      }
-      return ctx;
+      return c;
     }
 
     function noiseBuffer(context, seconds) {
@@ -1865,19 +1868,6 @@
   // ---------------------------------------------------------------------
 
   const SingingBowlStrike = (() => {
-    let ctx = null;
-
-    function ensureCtx() {
-      if (ctx && ctx.state === "closed") ctx = null;
-      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if (ctx.state !== "running") {
-        ctx.resume().catch((err) => {
-          showError(`无法播放颂钵。/ Couldn't play the bowl. (${err && err.message ? err.message : err})`);
-        });
-      }
-      return ctx;
-    }
-
     function noiseBuffer(c, seconds) {
       const len = Math.floor(c.sampleRate * seconds);
       const buffer = c.createBuffer(1, len, c.sampleRate);
@@ -1908,7 +1898,7 @@
     }
 
     function strike() {
-      const c = ensureCtx();
+      const c = SharedAudio.ensureCtx();
       const now = c.currentTime + 0.01;
 
       const master = c.createGain();
