@@ -868,7 +868,7 @@
     <div class="ambient-controls-row">
       <button class="secondary" id="ambientPlayBtn" type="button">▶️ 播放 Play</button>
       <label for="ambientVolume">音量 Vol</label>
-      <input type="range" id="ambientVolume" min="0" max="100" value="50">
+      <input type="range" id="ambientVolume" min="0" max="100" value="65">
     </div>
 
     <div class="field" style="margin-top:16px;">
@@ -1427,20 +1427,36 @@
     let scheduledIntervals = [];
     let currentSound = null;
     let isPlaying = false;
-    let targetVolume = 0.5;
+    let targetVolume = 0.65;
     let timerMinutes = 0;
     let timerEndsAt = null;
     let countdownInterval = null;
     let onStateChange = () => {};
 
     function ensureCtx() {
+      if (ctx && ctx.state === "closed") {
+        // Mobile Safari can kill the context after the tab is backgrounded
+        // (screen lock, app switch, phone call) — reusing a dead context
+        // means every future play() silently does nothing forever, so
+        // start fresh instead of trying to resume a closed one.
+        ctx = null;
+      }
       if (!ctx) {
         ctx = new (window.AudioContext || window.webkitAudioContext)();
         masterGain = ctx.createGain();
         masterGain.gain.value = 0;
         masterGain.connect(ctx.destination);
       }
-      if (ctx.state === "suspended") ctx.resume();
+      if (ctx.state === "suspended") {
+        // Must be called synchronously from inside the user-gesture click
+        // handler (it is — ensureCtx is only ever invoked from play(),
+        // which is only ever invoked from a click listener). The unlock
+        // itself resolves asynchronously; surface it if it ever fails
+        // instead of leaving the user staring at silence with no clue why.
+        ctx.resume().catch((err) => {
+          showError(`无法启动音频，请再点一次播放。/ Couldn't start audio — try pressing Play again. (${err && err.message ? err.message : err})`);
+        });
+      }
       return ctx;
     }
 
@@ -1474,7 +1490,7 @@
       const lfo = track(c.createOscillator()); lfo.frequency.value = 0.18;
       const lfoGain = track(c.createGain()); lfoGain.gain.value = 0.12;
       lfo.connect(lfoGain); lfoGain.connect(out.gain);
-      out.gain.value = 0.75;
+      out.gain.value = 0.85;
       src.start(); lfo.start();
     }
 
@@ -1487,7 +1503,7 @@
       const lfo = track(c.createOscillator()); lfo.type = "sine"; lfo.frequency.value = 0.09;
       const lfoGain = track(c.createGain()); lfoGain.gain.value = 0.45;
       lfo.connect(lfoGain); lfoGain.connect(out.gain);
-      out.gain.value = 0.5;
+      out.gain.value = 0.65;
       src.start(); lfo.start();
     }
 
@@ -1502,7 +1518,7 @@
       const lfo = track(c.createOscillator()); lfo.type = "sine"; lfo.frequency.value = 0.05;
       const lfoGain = track(c.createGain()); lfoGain.gain.value = 0.15;
       lfo.connect(lfoGain); lfoGain.connect(out.gain);
-      out.gain.value = 0.3;
+      out.gain.value = 0.4;
       src.start(); lfo.start();
 
       const crunch = () => {
@@ -1533,7 +1549,7 @@
       const hp = track(c.createBiquadFilter()); hp.type = "highpass"; hp.frequency.value = 250;
       const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 2200;
       src.connect(hp); hp.connect(lp); lp.connect(out);
-      out.gain.value = 0.4;
+      out.gain.value = 0.55;
       src.start();
 
       const chirp = () => {
@@ -1559,7 +1575,7 @@
       src.buffer = noiseBuffer(c, 4);
       src.loop = true;
       src.connect(out);
-      out.gain.value = 0.35;
+      out.gain.value = 0.5;
       src.start();
     }
 
@@ -1568,7 +1584,7 @@
       // faint high-passed noise bed for texture — an ambient approximation
       // rather than an actual beat, kept deliberately mellow.
       const freqs = [130.8, 164.8, 196.0, 246.9];
-      const padGain = track(c.createGain()); padGain.gain.value = 0.14;
+      const padGain = track(c.createGain()); padGain.gain.value = 0.22;
       const padFilter = track(c.createBiquadFilter()); padFilter.type = "lowpass"; padFilter.frequency.value = 900;
       padGain.connect(padFilter); padFilter.connect(out);
       freqs.forEach((f, i) => {
@@ -1590,7 +1606,7 @@
         osc.connect(g); g.connect(out);
         const now = c.currentTime;
         g.gain.setValueAtTime(0, now);
-        g.gain.linearRampToValueAtTime(0.18, now + 0.03);
+        g.gain.linearRampToValueAtTime(0.26, now + 0.03);
         g.gain.linearRampToValueAtTime(0, now + 0.5);
         osc.start(now);
         osc.stop(now + 0.55);
@@ -1646,10 +1662,20 @@
     }
 
     function play(type) {
-      if (type) build(type);
-      else if (!currentSound) build(SOUND_PROFILES[0].id);
+      try {
+        if (type) build(type);
+        else if (!currentSound) build(SOUND_PROFILES[0].id);
+      } catch (err) {
+        // Surface it — a silent catch here is exactly how "I clicked Play
+        // and nothing happened" bugs go undiagnosed.
+        showError(`播放失败 Playback failed: ${err && err.message ? err.message : err}`);
+        return;
+      }
       isPlaying = true;
-      fadeMasterTo(targetVolume, 2.5);
+      // A short, snappy fade-in (was 2.5s) — long enough to avoid a click/
+      // pop, short enough that pressing Play gives audible confirmation
+      // almost immediately instead of "did anything happen?".
+      fadeMasterTo(targetVolume, 0.5);
       if (timerMinutes > 0) {
         timerEndsAt = Date.now() + timerMinutes * 60000;
         startCountdown();
