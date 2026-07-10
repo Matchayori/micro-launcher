@@ -182,6 +182,25 @@
     animation: micPulse 1s ease-in-out infinite;
   }
   .mic-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .mic-recording-dot {
+    display: none;
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #e53935;
+  }
+  .mic-btn.recording .mic-recording-dot {
+    display: block;
+    animation: micDotPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes micDotPulse {
+    0% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.6); }
+    70% { box-shadow: 0 0 0 8px rgba(229, 57, 53, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0); }
+  }
   @keyframes micPulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(161, 84, 58, 0.35); }
     50% { box-shadow: 0 0 0 8px rgba(161, 84, 58, 0); }
@@ -736,11 +755,11 @@
     <div id="starterForm">
       <div id="taskStep">
         <label for="taskInput">今天卡在哪儿了？Where are you stuck today?</label>
-        <div class="hint">打字，或按住 🎤 / 空格键说话。<br>Type, or hold 🎤 / Space to talk.</div>
+        <div class="hint">打字，或点击 🎤 开始/停止说话（也可按住空格键）。<br>Type, tap 🎤 to start/stop talking (or hold Space).</div>
 
         <div class="input-with-mic">
           <textarea id="taskInput" placeholder="例如：我需要回复导师的邮件，但一想到打开邮箱就很抗拒…&#10;e.g. I need to reply to my advisor's email but I feel a wall of resistance just thinking about opening my inbox…" autofocus></textarea>
-          <button class="mic-btn" id="taskMicBtn" type="button" title="按住说话 Hold to talk">🎤</button>
+          <button class="mic-btn" id="taskMicBtn" type="button" title="点击说话 Click to talk"><span class="mic-icon">🎤</span><span class="mic-recording-dot" aria-hidden="true"></span></button>
         </div>
         <div class="mic-meta" id="taskMicStatus"></div>
 
@@ -799,7 +818,7 @@
       <div class="reply-row">
         <div class="input-with-mic">
           <textarea id="replyInput" rows="2" placeholder="继续说… / Keep going…"></textarea>
-          <button class="mic-btn" id="replyMicBtn" type="button" title="按住说话 Hold to talk">🎤</button>
+          <button class="mic-btn" id="replyMicBtn" type="button" title="点击说话 Click to talk"><span class="mic-icon">🎤</span><span class="mic-recording-dot" aria-hidden="true"></span></button>
         </div>
         <button class="icon-btn" id="replySendBtn" title="发送 Send" type="button">➤</button>
       </div>
@@ -830,7 +849,7 @@
 
     <div class="field">
       <label>语音识别语言 Voice recognition language</label>
-      <div class="hint">按住 🎤 说话时使用的识别语言。<br>Language used when you hold 🎤 to talk.</div>
+      <div class="hint">点击 🎤 说话时使用的识别语言。<br>Language used when you tap 🎤 to talk.</div>
       <div class="presets" id="micLangOptions"></div>
     </div>
 
@@ -1829,10 +1848,10 @@
   }
 
   // ---------------------------------------------------------------------
-  // Voice input (Web Speech API) — hold the 🎤 button, or hold Space when
-  // focus isn't in a text field, to talk. Release to stop recording — the
-  // transcript is left in the box for you to review/edit; it never
-  // auto-submits. You always click Send/Just say it yourself.
+  // Voice input (Web Speech API) — click the 🎤 button once to start
+  // recording, click again to stop (or hold Space when focus isn't in a
+  // text field). The transcript is left in the box for you to review/edit;
+  // it never auto-submits. You always click Send/Just say it yourself.
   // ---------------------------------------------------------------------
 
   const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1845,8 +1864,10 @@
       return { start() {}, stop() {}, isRecording: () => false };
     }
 
+    const micIcon = micBtn.querySelector(".mic-icon");
     let recognition = null;
     let recording = false;
+    let requestingPermission = false;
     let finalTranscript = "";
     let baseValue = "";
 
@@ -1899,18 +1920,41 @@
       try { recognition.start(); } catch { /* noop — starting too soon after a previous instance */ }
     }
 
-    function start() {
-      if (recording) return;
-      // Guarantee any leftover instance from a previous press is fully
+    async function start() {
+      if (recording || requestingPermission) return;
+      // Guarantee any leftover instance from a previous session is fully
       // stopped before spinning up a new one.
       teardown(recognition);
       recognition = null;
+
+      // Request mic access explicitly via getUserMedia before touching
+      // SpeechRecognition: this surfaces a denial immediately and clearly,
+      // instead of waiting on SpeechRecognition's own "not-allowed" error,
+      // whose timing is inconsistent across browsers. We don't need the
+      // stream itself — SpeechRecognition captures audio on its own — so
+      // stop it right away and only use this call to drive the permission
+      // prompt and catch a rejection.
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        requestingPermission = true;
+        statusEl.textContent = "请求麦克风权限… Requesting mic permission…";
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((t) => t.stop());
+        } catch (err) {
+          requestingPermission = false;
+          statusEl.textContent = "麦克风权限被拒绝 / Microphone permission denied";
+          return;
+        }
+        requestingPermission = false;
+      }
 
       recording = true;
       finalTranscript = "";
       baseValue = textarea.value ? textarea.value + " " : "";
       micBtn.classList.add("recording");
-      statusEl.textContent = "🔴 正在聆听… Listening…";
+      micBtn.title = "点击停止 Click to stop";
+      if (micIcon) micIcon.textContent = "⏹";
+      statusEl.textContent = "🔴 录音中… Listening…";
       launchInstance();
     }
 
@@ -1918,6 +1962,8 @@
       if (!recording) return;
       recording = false;
       micBtn.classList.remove("recording");
+      micBtn.title = "点击说话 Click to talk";
+      if (micIcon) micIcon.textContent = "🎤";
       statusEl.textContent = "";
       teardown(recognition);
       recognition = null;
@@ -1925,11 +1971,10 @@
       textarea.focus();
     }
 
-    const startPress = (e) => { e.preventDefault(); start(); };
-    micBtn.addEventListener("mousedown", startPress);
-    micBtn.addEventListener("touchstart", startPress, { passive: false });
-    micBtn.addEventListener("touchend", stop);
-    document.addEventListener("mouseup", () => { if (recording) stop(); });
+    micBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (recording) stop(); else start();
+    });
 
     return { start, stop, isRecording: () => recording };
   }
@@ -2561,11 +2606,16 @@
     $("completedBtn").textContent = "✓ 已完成 Logged";
     const msg = COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)];
     $("completionMessage").textContent = msg;
-    Celebration.play();
-    launchConfetti();
+
+    // Saving history is the part that actually matters — do it before the
+    // decorative chime/confetti so a broken AudioContext (seen for real on
+    // some Safari setups) can't throw and silently skip the save.
     currentSessionCompleted = true;
     saveCurrentSession(true);
     if ($("historyDrawer").classList.contains("open")) renderHistoryList();
+
+    try { Celebration.play(); } catch { /* decorative — never block completion on this */ }
+    try { launchConfetti(); } catch { /* decorative — never block completion on this */ }
   });
 
   $("startOverBtn").addEventListener("click", () => {
