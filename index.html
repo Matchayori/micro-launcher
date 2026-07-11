@@ -1024,9 +1024,6 @@
     { id: "rain", label: "🌧 雨声 Rain" },
     { id: "ocean", label: "🌊 海浪 Ocean" },
     { id: "snow", label: "❄️ 雪 Snow" },
-    { id: "lofi", label: "🎵 Lo-fi" },
-    { id: "forest", label: "🌲 森林 Forest" },
-    { id: "white", label: "⚪ 白噪音 White noise" },
     { id: "bowl", label: "🔔 颂钵 Singing bowl" },
   ];
 
@@ -1525,146 +1522,244 @@
     }
 
     function buildRain(c, out) {
-      const src = track(c.createBufferSource());
-      src.buffer = noiseBuffer(c, 4);
-      src.loop = true;
-      const hp = track(c.createBiquadFilter()); hp.type = "highpass"; hp.frequency.value = 1000;
-      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 7000;
-      src.connect(hp); hp.connect(lp); lp.connect(out);
-      const lfo = track(c.createOscillator()); lfo.frequency.value = 0.18;
-      const lfoGain = track(c.createGain()); lfoGain.gain.value = 0.12;
-      lfo.connect(lfoGain); lfoGain.connect(out.gain);
-      out.gain.value = 0.85;
-      src.start(); lfo.start();
+      // Two independently-looping noise beds at different, non-matching
+      // lengths (7s / 11s) so their combined texture never lines up on a
+      // short, noticeable cycle — a steady "hiss" floor for the rain.
+      const bedA = track(c.createBufferSource());
+      bedA.buffer = noiseBuffer(c, 7);
+      bedA.loop = true;
+      const bedAFilter = track(c.createBiquadFilter());
+      bedAFilter.type = "bandpass";
+      bedAFilter.frequency.value = 3200;
+      bedAFilter.Q.value = 0.6;
+      const bedAGain = track(c.createGain());
+      bedAGain.gain.value = 0.28;
+      bedA.connect(bedAFilter); bedAFilter.connect(bedAGain); bedAGain.connect(out);
+
+      const bedB = track(c.createBufferSource());
+      bedB.buffer = noiseBuffer(c, 11);
+      bedB.loop = true;
+      const bedBFilter = track(c.createBiquadFilter());
+      bedBFilter.type = "bandpass";
+      bedBFilter.frequency.value = 5200;
+      bedBFilter.Q.value = 0.5;
+      const bedBGain = track(c.createGain());
+      bedBGain.gain.value = 0.18;
+      bedB.connect(bedBFilter); bedBFilter.connect(bedBGain); bedBGain.connect(out);
+
+      bedA.start(); bedB.start();
+
+      // Overall breathing: rather than a fixed-rate sine LFO (which reads
+      // as an obvious loop once you notice it), randomly ramp the bed
+      // toward a new target level over a random duration, then pick the
+      // next target — an organic drift that never repeats on a fixed
+      // cycle. `intensity` also drives the raindrop density below, so the
+      // whole texture surges and eases together.
+      let intensity = 0.85;
+      const breathe = () => {
+        if (!isPlaying || currentSound !== "rain") return;
+        intensity = 0.55 + Math.random() * 0.55;
+        const now = c.currentTime;
+        const dur = 4 + Math.random() * 5;
+        bedAGain.gain.cancelScheduledValues(now);
+        bedAGain.gain.setValueAtTime(bedAGain.gain.value, now);
+        bedAGain.gain.linearRampToValueAtTime(0.28 * intensity, now + dur);
+        bedBGain.gain.cancelScheduledValues(now);
+        bedBGain.gain.setValueAtTime(bedBGain.gain.value, now);
+        bedBGain.gain.linearRampToValueAtTime(0.18 * intensity, now + dur);
+        scheduledIntervals.push(setTimeout(breathe, dur * 1000));
+      };
+      // Deferred, not called directly: Ambient.play() sets isPlaying = true
+      // only *after* build() returns, and these self-rescheduling
+      // generators bail out immediately if isPlaying isn't true yet — a
+      // direct synchronous call here would run before that flag flips and
+      // silently never reschedule itself again. setTimeout(fn, 0) defers
+      // to right after play() finishes, once isPlaying is actually true.
+      scheduledIntervals.push(setTimeout(breathe, 0));
+
+      // Individual raindrops: short, randomly-pitched ticks at randomized
+      // intervals — never a fixed rhythm — whose average rate rises and
+      // falls with `intensity` so density visibly changes over time.
+      const drop = () => {
+        if (!isPlaying || currentSound !== "rain") return;
+        const dropSrc = c.createBufferSource();
+        dropSrc.buffer = noiseBuffer(c, 0.05);
+        const dropFilter = c.createBiquadFilter();
+        dropFilter.type = "bandpass";
+        dropFilter.frequency.value = 2500 + Math.random() * 3500;
+        dropFilter.Q.value = 3 + Math.random() * 3;
+        const dropGain = c.createGain();
+        dropGain.gain.value = 0;
+        dropSrc.connect(dropFilter); dropFilter.connect(dropGain); dropGain.connect(out);
+        const now = c.currentTime;
+        const peak = (0.03 + Math.random() * 0.05) * intensity;
+        dropGain.gain.setValueAtTime(0, now);
+        dropGain.gain.linearRampToValueAtTime(peak, now + 0.004);
+        dropGain.gain.exponentialRampToValueAtTime(0.0005, now + 0.04 + Math.random() * 0.03);
+        dropSrc.start(now);
+        dropSrc.stop(now + 0.09);
+
+        scheduledIntervals.push(setTimeout(drop, (30 + Math.random() * 90) / intensity));
+      };
+      scheduledIntervals.push(setTimeout(drop, 0));
+
+      // Distant thunder: rare, slow, low-frequency rumble.
+      const thunder = () => {
+        if (!isPlaying || currentSound !== "rain") return;
+        const dur = 1.8 + Math.random() * 1.8;
+        const rumbleSrc = c.createBufferSource();
+        rumbleSrc.buffer = noiseBuffer(c, dur);
+        const rumbleFilter = c.createBiquadFilter();
+        rumbleFilter.type = "lowpass";
+        rumbleFilter.frequency.value = 120 + Math.random() * 100;
+        const rumbleGain = c.createGain();
+        rumbleGain.gain.value = 0;
+        rumbleSrc.connect(rumbleFilter); rumbleFilter.connect(rumbleGain); rumbleGain.connect(out);
+        const now = c.currentTime;
+        const peak = 0.1 + Math.random() * 0.1;
+        rumbleGain.gain.setValueAtTime(0, now);
+        rumbleGain.gain.linearRampToValueAtTime(peak, now + dur * 0.3);
+        rumbleGain.gain.exponentialRampToValueAtTime(0.0005, now + dur);
+        rumbleSrc.start(now);
+        rumbleSrc.stop(now + dur + 0.1);
+
+        scheduledIntervals.push(setTimeout(thunder, 22000 + Math.random() * 45000));
+      };
+      scheduledIntervals.push(setTimeout(thunder, 8000 + Math.random() * 15000));
+
+      out.gain.value = 1;
     }
 
     function buildOcean(c, out) {
       const src = track(c.createBufferSource());
-      src.buffer = noiseBuffer(c, 6);
+      src.buffer = noiseBuffer(c, 9);
       src.loop = true;
-      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 800;
-      src.connect(lp); lp.connect(out);
-      const lfo = track(c.createOscillator()); lfo.type = "sine"; lfo.frequency.value = 0.09;
-      const lfoGain = track(c.createGain()); lfoGain.gain.value = 0.45;
-      lfo.connect(lfoGain); lfoGain.connect(out.gain);
-      out.gain.value = 0.65;
-      src.start(); lfo.start();
+      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 750;
+      const waveGain = track(c.createGain());
+      waveGain.gain.value = 0;
+      src.connect(lp); lp.connect(waveGain); waveGain.connect(out);
+      src.start();
+
+      // Each wave is its own randomized envelope — 6-10s, its own peak
+      // volume and rise/fall shape — so no two waves are identical and
+      // there's no fixed cycle to notice.
+      const nextWave = () => {
+        if (!isPlaying || currentSound !== "ocean") return;
+        const duration = 6 + Math.random() * 4;
+        const peak = 0.45 + Math.random() * 0.35;
+        const riseFrac = 0.35 + Math.random() * 0.15;
+        const now = c.currentTime;
+        waveGain.gain.cancelScheduledValues(now);
+        waveGain.gain.setValueAtTime(waveGain.gain.value, now);
+        waveGain.gain.linearRampToValueAtTime(peak, now + duration * riseFrac);
+        waveGain.gain.linearRampToValueAtTime(0.05 + Math.random() * 0.05, now + duration);
+        scheduledIntervals.push(setTimeout(nextWave, duration * 1000));
+      };
+      // Deferred — see the comment in buildRain's breathe() above: play()
+      // sets isPlaying = true only after build() returns.
+      scheduledIntervals.push(setTimeout(nextWave, 0));
+
+      // Distant wind layer — a quieter, brighter noise bed with its own
+      // slow, independent drift so it never lines up with the wave cycle.
+      const windSrc = track(c.createBufferSource());
+      windSrc.buffer = noiseBuffer(c, 13);
+      windSrc.loop = true;
+      const windFilter = track(c.createBiquadFilter());
+      windFilter.type = "bandpass";
+      windFilter.frequency.value = 900;
+      windFilter.Q.value = 0.4;
+      const windGain = track(c.createGain());
+      windGain.gain.value = 0.08;
+      windSrc.connect(windFilter); windFilter.connect(windGain); windGain.connect(out);
+      windSrc.start();
+
+      const windDrift = () => {
+        if (!isPlaying || currentSound !== "ocean") return;
+        const now = c.currentTime;
+        const dur = 6 + Math.random() * 8;
+        windGain.gain.cancelScheduledValues(now);
+        windGain.gain.setValueAtTime(windGain.gain.value, now);
+        windGain.gain.linearRampToValueAtTime(0.04 + Math.random() * 0.09, now + dur);
+        scheduledIntervals.push(setTimeout(windDrift, dur * 1000));
+      };
+      scheduledIntervals.push(setTimeout(windDrift, 0));
+
+      out.gain.value = 1;
     }
 
     function buildSnow(c, out) {
-      // A hushed, muffled bed (heavy low-pass) with a very slow gust swell
-      // and rare, faint "crunch" bursts — like standing in falling snow.
-      const src = track(c.createBufferSource());
-      src.buffer = noiseBuffer(c, 6);
-      src.loop = true;
-      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 450;
-      src.connect(lp); lp.connect(out);
-      const lfo = track(c.createOscillator()); lfo.type = "sine"; lfo.frequency.value = 0.05;
-      const lfoGain = track(c.createGain()); lfoGain.gain.value = 0.15;
-      lfo.connect(lfoGain); lfoGain.connect(out.gain);
-      out.gain.value = 0.4;
-      src.start(); lfo.start();
+      // A very soft, heavily-hushed noise bed with its own slow organic
+      // drift — no fixed-rate LFO, so the swell never reads as looping.
+      const bed = track(c.createBufferSource());
+      bed.buffer = noiseBuffer(c, 10);
+      bed.loop = true;
+      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 380;
+      const bedGain = track(c.createGain());
+      bedGain.gain.value = 0.3;
+      bed.connect(lp); lp.connect(bedGain); bedGain.connect(out);
+      bed.start();
 
-      const crunch = () => {
+      const breathe = () => {
         if (!isPlaying || currentSound !== "snow") return;
-        const crunchSrc = c.createBufferSource();
-        crunchSrc.buffer = noiseBuffer(c, 0.3);
-        const crunchFilter = c.createBiquadFilter();
-        crunchFilter.type = "bandpass";
-        crunchFilter.frequency.value = 800 + Math.random() * 400;
-        crunchFilter.Q.value = 0.7;
-        const crunchGain = c.createGain();
-        crunchGain.gain.value = 0;
-        crunchSrc.connect(crunchFilter); crunchFilter.connect(crunchGain); crunchGain.connect(out);
         const now = c.currentTime;
-        crunchGain.gain.setValueAtTime(0, now);
-        crunchGain.gain.linearRampToValueAtTime(0.05, now + 0.05);
-        crunchGain.gain.linearRampToValueAtTime(0, now + 0.35);
-        crunchSrc.start(now);
-        crunchSrc.stop(now + 0.4);
+        const dur = 7 + Math.random() * 9;
+        bedGain.gain.cancelScheduledValues(now);
+        bedGain.gain.setValueAtTime(bedGain.gain.value, now);
+        bedGain.gain.linearRampToValueAtTime(0.18 + Math.random() * 0.22, now + dur);
+        scheduledIntervals.push(setTimeout(breathe, dur * 1000));
       };
-      scheduledIntervals.push(setInterval(crunch, 9000 + Math.random() * 6000));
-    }
+      // Deferred — see the comment in buildRain's breathe() above.
+      scheduledIntervals.push(setTimeout(breathe, 0));
 
-    function buildForest(c, out) {
-      const src = track(c.createBufferSource());
-      src.buffer = noiseBuffer(c, 4);
-      src.loop = true;
-      const hp = track(c.createBiquadFilter()); hp.type = "highpass"; hp.frequency.value = 250;
-      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 2200;
-      src.connect(hp); hp.connect(lp); lp.connect(out);
-      out.gain.value = 0.55;
-      src.start();
-
-      const chirp = () => {
-        if (!isPlaying || currentSound !== "forest") return;
-        const osc = c.createOscillator();
-        osc.type = "sine";
-        osc.frequency.value = 1800 + Math.random() * 1400;
-        const g = c.createGain();
-        g.gain.value = 0;
-        osc.connect(g); g.connect(out);
+      // Occasional, very soft granular specks — snowflakes ticking
+      // against the window — sparse and irregular, never a fixed rhythm.
+      const speck = () => {
+        if (!isPlaying || currentSound !== "snow") return;
+        const speckSrc = c.createBufferSource();
+        speckSrc.buffer = noiseBuffer(c, 0.05);
+        const speckFilter = c.createBiquadFilter();
+        speckFilter.type = "bandpass";
+        speckFilter.frequency.value = 1800 + Math.random() * 2200;
+        speckFilter.Q.value = 4 + Math.random() * 4;
+        const speckGain = c.createGain();
+        speckGain.gain.value = 0;
+        speckSrc.connect(speckFilter); speckFilter.connect(speckGain); speckGain.connect(out);
         const now = c.currentTime;
-        g.gain.setValueAtTime(0, now);
-        g.gain.linearRampToValueAtTime(0.06, now + 0.05);
-        g.gain.linearRampToValueAtTime(0, now + 0.22);
-        osc.start(now);
-        osc.stop(now + 0.25);
+        const peak = 0.015 + Math.random() * 0.02;
+        speckGain.gain.setValueAtTime(0, now);
+        speckGain.gain.linearRampToValueAtTime(peak, now + 0.006);
+        speckGain.gain.exponentialRampToValueAtTime(0.0004, now + 0.05);
+        speckSrc.start(now);
+        speckSrc.stop(now + 0.1);
+
+        scheduledIntervals.push(setTimeout(speck, 700 + Math.random() * 2600));
       };
-      scheduledIntervals.push(setInterval(chirp, 2800 + Math.random() * 2400));
-    }
+      scheduledIntervals.push(setTimeout(speck, 1500 + Math.random() * 2000));
 
-    function buildWhite(c, out) {
-      const src = track(c.createBufferSource());
-      src.buffer = noiseBuffer(c, 4);
-      src.loop = true;
-      src.connect(out);
-      out.gain.value = 0.5;
-      src.start();
-    }
+      // Distant, barely-there wind — drifts in and out of audibility
+      // (sometimes fading to nothing) rather than a steady presence.
+      const windSrc = track(c.createBufferSource());
+      windSrc.buffer = noiseBuffer(c, 14);
+      windSrc.loop = true;
+      const windFilter = track(c.createBiquadFilter());
+      windFilter.type = "bandpass";
+      windFilter.frequency.value = 500;
+      windFilter.Q.value = 0.5;
+      const windGain = track(c.createGain());
+      windGain.gain.value = 0;
+      windSrc.connect(windFilter); windFilter.connect(windGain); windGain.connect(out);
+      windSrc.start();
 
-    function buildLofi(c, out) {
-      // Soft chord pad (Cmaj7-ish), a slow low "heartbeat" pulse, and a
-      // faint high-passed noise bed for texture — an ambient approximation
-      // rather than an actual beat, kept deliberately mellow.
-      const freqs = [130.8, 164.8, 196.0, 246.9];
-      const padGain = track(c.createGain()); padGain.gain.value = 0.22;
-      const padFilter = track(c.createBiquadFilter()); padFilter.type = "lowpass"; padFilter.frequency.value = 900;
-      padGain.connect(padFilter); padFilter.connect(out);
-      freqs.forEach((f, i) => {
-        const osc = track(c.createOscillator());
-        osc.type = "triangle";
-        osc.frequency.value = f;
-        osc.detune.value = (i - 1.5) * 4;
-        osc.connect(padGain);
-        osc.start();
-      });
-
-      const pulse = () => {
-        if (!isPlaying || currentSound !== "lofi") return;
-        const osc = c.createOscillator();
-        osc.type = "sine";
-        osc.frequency.value = 62;
-        const g = c.createGain();
-        g.gain.value = 0;
-        osc.connect(g); g.connect(out);
+      const windDrift = () => {
+        if (!isPlaying || currentSound !== "snow") return;
         const now = c.currentTime;
-        g.gain.setValueAtTime(0, now);
-        g.gain.linearRampToValueAtTime(0.26, now + 0.03);
-        g.gain.linearRampToValueAtTime(0, now + 0.5);
-        osc.start(now);
-        osc.stop(now + 0.55);
+        const dur = 8 + Math.random() * 10;
+        windGain.gain.cancelScheduledValues(now);
+        windGain.gain.setValueAtTime(windGain.gain.value, now);
+        windGain.gain.linearRampToValueAtTime(Math.random() < 0.4 ? 0 : 0.02 + Math.random() * 0.05, now + dur);
+        scheduledIntervals.push(setTimeout(windDrift, dur * 1000));
       };
-      pulse();
-      scheduledIntervals.push(setInterval(pulse, 1600));
-
-      const crackle = track(c.createBufferSource());
-      crackle.buffer = noiseBuffer(c, 4);
-      crackle.loop = true;
-      const crackleFilter = track(c.createBiquadFilter()); crackleFilter.type = "highpass"; crackleFilter.frequency.value = 4000;
-      const crackleGain = track(c.createGain()); crackleGain.gain.value = 0.04;
-      crackle.connect(crackleFilter); crackleFilter.connect(crackleGain); crackleGain.connect(out);
-      crackle.start();
+      scheduledIntervals.push(setTimeout(windDrift, 0));
 
       out.gain.value = 1;
     }
@@ -1743,7 +1838,7 @@
       out.gain.value = 1;
     }
 
-    const BUILDERS = { rain: buildRain, ocean: buildOcean, snow: buildSnow, forest: buildForest, white: buildWhite, lofi: buildLofi, bowl: buildSingingBowl };
+    const BUILDERS = { rain: buildRain, ocean: buildOcean, snow: buildSnow, bowl: buildSingingBowl };
 
     function build(type) {
       const c = ensureCtx();
@@ -1751,7 +1846,7 @@
       const out = track(c.createGain());
       out.gain.value = 1;
       out.connect(masterGain);
-      (BUILDERS[type] || buildWhite)(c, out);
+      (BUILDERS[type] || buildRain)(c, out);
       currentSound = type;
     }
 
