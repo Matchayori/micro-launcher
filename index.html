@@ -1063,6 +1063,8 @@
 
 5. 用用户书写时使用的语言回复（中文、英文，或中英混合都可以）。
 
+6. 程序标记（只写给程序看，不是写给用户看，用户不会读到这一行）：只要这一轮回复里包含了具体的下一步行动建议——不管是通过"试试这个 / Try this:"这个环节给出的，还是在 🔴/🟠 象限下直接给出的模板、草稿或最小行动——就必须在整段回复的最末尾另起一行，一字不改地输出：[[ACTION_READY]]。不要加粗、不要解释、不要用任何方式提及这个标记的存在。如果这一轮还在提问、探索、反映感受，没有给出具体行动，就不要输出它。
+
 记住：这是一段对话，不是问答机——先陪伴、再挖掘、最后才是行动（🔴 和 🟠 象限除外，那两种情况请直接给行动）。`;
 
   const DEFAULT_QUICK_LINKS = [
@@ -2871,12 +2873,29 @@
   let emailOffered = false; // whether the email-paste box has been revealed this conversation
   let pendingTask = ""; // task text captured before the quadrant step
 
-  function isFinalTurn(text) {
-    // Two distinct final-turn formats the system prompt can produce: the
-    // usual "next step" heading, or — for email-reply conversations — a
-    // draft reply block instead. Both mean the conversation has reached
-    // its actionable end and the completion button should show.
+  // The system prompt asks Claude to append this exact, invisible-to-the-
+  // user marker whenever a turn gives a concrete next step / micro-action.
+  // Detecting the button's visibility off this structural marker — instead
+  // of pattern-matching the human-facing reply text — is what makes the
+  // button reliable even when the model phrases the action turn slightly
+  // differently. The marker itself is never shown; it's stripped before
+  // the reply is rendered, stored, or copied anywhere.
+  const ACTION_MARKER = "[[ACTION_READY]]";
+
+  function stripActionMarker(text) {
+    return text.split(ACTION_MARKER).join("").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  // Fallback for conversations running a user-customized system prompt that
+  // predates (or was edited to drop) the ACTION_MARKER instruction — keeps
+  // the button working, just less reliably, by falling back to matching the
+  // two heading formats the default prompt has historically produced.
+  function looksLikeActionText(text) {
     return /试试这个|try this\s*:?/i.test(text) || /回复草稿|draft reply/i.test(text);
+  }
+
+  function hasActionStep(rawText) {
+    return rawText.includes(ACTION_MARKER) || looksLikeActionText(rawText);
   }
 
   function mentionsEmail(text) {
@@ -2987,7 +3006,7 @@
       : "打开了 Outlook，但复制失败，请手动复制草稿。/ Opened Outlook, but copying failed — please copy the draft manually.";
   }
 
-  function addAssistantBubble(text) {
+  function addAssistantBubble(text, actionReady) {
     maybeOfferEmailInline(text);
 
     const thread = $("chatThread");
@@ -2995,7 +3014,7 @@
     div.className = "bubble bubble-assistant";
     div.innerHTML = renderLite(text);
 
-    if (isFinalTurn(text)) {
+    if (actionReady) {
       // Ambient-sound suggestion, right where the action was just given.
       const suggest = document.createElement("div");
       suggest.className = "ambient-suggest";
@@ -3053,10 +3072,12 @@
     $("replySendBtn").disabled = true;
     $("submitBtn").disabled = true;
     try {
-      const reply = await callClaude(conversation);
+      const rawReply = await callClaude(conversation);
+      const actionReady = hasActionStep(rawReply);
+      const reply = stripActionMarker(rawReply);
       conversation.push({ role: "assistant", content: reply });
       removeTypingBubble();
-      addAssistantBubble(reply);
+      addAssistantBubble(reply, actionReady);
     } catch (err) {
       removeTypingBubble();
       showError(err.message || String(err));
@@ -3107,10 +3128,9 @@
 
   function findBlockerInConversation(convo) {
     for (let i = convo.length - 1; i >= 0; i--) {
-      if (convo[i].role === "assistant" && isFinalTurn(convo[i].content)) {
-        const blocker = extractBlockerReason(convo[i].content);
-        if (blocker) return blocker;
-      }
+      if (convo[i].role !== "assistant") continue;
+      const blocker = extractBlockerReason(convo[i].content);
+      if (blocker) return blocker;
     }
     return null;
   }
