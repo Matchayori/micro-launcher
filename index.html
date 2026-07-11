@@ -1688,62 +1688,100 @@
     }
 
     function buildSnow(c, out) {
-      // A very soft, heavily-hushed noise bed with its own slow organic
-      // drift — no fixed-rate LFO, so the swell never reads as looping.
+      // Noise bed pushed well above the old 380Hz lowpass (which read as a
+      // low hum) and highpassed from below too — an airy hiss with the
+      // bass content stripped out, not a rumble.
       const bed = track(c.createBufferSource());
       bed.buffer = noiseBuffer(c, 10);
       bed.loop = true;
-      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 380;
+      const bedHp = track(c.createBiquadFilter()); bedHp.type = "highpass"; bedHp.frequency.value = 250;
+      const bedLp = track(c.createBiquadFilter()); bedLp.type = "lowpass"; bedLp.frequency.value = 900;
       const bedGain = track(c.createGain());
-      bedGain.gain.value = 0.3;
-      bed.connect(lp); lp.connect(bedGain); bedGain.connect(out);
+      bedGain.gain.value = 0.14;
+      bed.connect(bedHp); bedHp.connect(bedLp); bedLp.connect(bedGain); bedGain.connect(out);
       bed.start();
 
+      // `intensity` drives the bed level *and* the patter/speck rates below
+      // together, so quiet lulls and denser flurries read as one
+      // coordinated swing rather than independently-drifting layers — this
+      // is what makes the density change actually noticeable.
+      let intensity = 0.8;
       const breathe = () => {
         if (!isPlaying || currentSound !== "snow") return;
+        intensity = 0.45 + Math.random() * 0.9;
         const now = c.currentTime;
-        const dur = 7 + Math.random() * 9;
+        const dur = 6 + Math.random() * 8;
         bedGain.gain.cancelScheduledValues(now);
         bedGain.gain.setValueAtTime(bedGain.gain.value, now);
-        bedGain.gain.linearRampToValueAtTime(0.18 + Math.random() * 0.22, now + dur);
+        bedGain.gain.linearRampToValueAtTime(0.14 * intensity, now + dur);
         scheduledIntervals.push(setTimeout(breathe, dur * 1000));
       };
       // Deferred — see the comment in buildRain's breathe() above.
       scheduledIntervals.push(setTimeout(breathe, 0));
 
-      // Occasional, very soft granular specks — snowflakes ticking
-      // against the window — sparse and irregular, never a fixed rhythm.
+      // The 淅淅沥沥 patter: a dense stream of very light, short, high
+      // grains — this is the layer the old sparse "specks" (below) were
+      // missing. Its rate scales inversely with `intensity` (like rain's
+      // drops), so it visibly thickens into a patter and thins back out
+      // instead of sitting at one constant average density.
+      const patter = () => {
+        if (!isPlaying || currentSound !== "snow") return;
+        const src = c.createBufferSource();
+        src.buffer = noiseBuffer(c, 0.03);
+        const filter = c.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.value = 2800 + Math.random() * 3200;
+        filter.Q.value = 3 + Math.random() * 5;
+        const gain = c.createGain();
+        gain.gain.value = 0;
+        src.connect(filter); filter.connect(gain); gain.connect(out);
+        const now = c.currentTime;
+        const peak = (0.006 + Math.random() * 0.014) * intensity;
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(peak, now + 0.003);
+        gain.gain.exponentialRampToValueAtTime(0.0003, now + 0.025 + Math.random() * 0.02);
+        src.start(now);
+        src.stop(now + 0.06);
+
+        scheduledIntervals.push(setTimeout(patter, (18 + Math.random() * 55) / intensity));
+      };
+      scheduledIntervals.push(setTimeout(patter, 0));
+
+      // Occasional heavier flake ticks poking through the patter, so the
+      // texture doesn't read as one uniform grain — sparse and irregular,
+      // rate also following `intensity`.
       const speck = () => {
         if (!isPlaying || currentSound !== "snow") return;
         const speckSrc = c.createBufferSource();
         speckSrc.buffer = noiseBuffer(c, 0.05);
         const speckFilter = c.createBiquadFilter();
         speckFilter.type = "bandpass";
-        speckFilter.frequency.value = 1800 + Math.random() * 2200;
+        speckFilter.frequency.value = 1600 + Math.random() * 1800;
         speckFilter.Q.value = 4 + Math.random() * 4;
         const speckGain = c.createGain();
         speckGain.gain.value = 0;
         speckSrc.connect(speckFilter); speckFilter.connect(speckGain); speckGain.connect(out);
         const now = c.currentTime;
-        const peak = 0.015 + Math.random() * 0.02;
+        const peak = (0.02 + Math.random() * 0.025) * intensity;
         speckGain.gain.setValueAtTime(0, now);
         speckGain.gain.linearRampToValueAtTime(peak, now + 0.006);
         speckGain.gain.exponentialRampToValueAtTime(0.0004, now + 0.05);
         speckSrc.start(now);
         speckSrc.stop(now + 0.1);
 
-        scheduledIntervals.push(setTimeout(speck, 700 + Math.random() * 2600));
+        scheduledIntervals.push(setTimeout(speck, (900 + Math.random() * 2200) / intensity));
       };
-      scheduledIntervals.push(setTimeout(speck, 1500 + Math.random() * 2000));
+      scheduledIntervals.push(setTimeout(speck, 1200 + Math.random() * 1500));
 
-      // Distant, barely-there wind — drifts in and out of audibility
-      // (sometimes fading to nothing) rather than a steady presence.
+      // Distant wind, pushed higher so it stays airy instead of adding to
+      // the low end — drifts in and out of audibility rather than a
+      // steady presence.
       const windSrc = track(c.createBufferSource());
       windSrc.buffer = noiseBuffer(c, 14);
       windSrc.loop = true;
       const windFilter = track(c.createBiquadFilter());
       windFilter.type = "bandpass";
-      windFilter.frequency.value = 500;
+      windFilter.frequency.value = 750;
       windFilter.Q.value = 0.5;
       const windGain = track(c.createGain());
       windGain.gain.value = 0;
@@ -1756,7 +1794,7 @@
         const dur = 8 + Math.random() * 10;
         windGain.gain.cancelScheduledValues(now);
         windGain.gain.setValueAtTime(windGain.gain.value, now);
-        windGain.gain.linearRampToValueAtTime(Math.random() < 0.4 ? 0 : 0.02 + Math.random() * 0.05, now + dur);
+        windGain.gain.linearRampToValueAtTime(Math.random() < 0.4 ? 0 : 0.015 + Math.random() * 0.035, now + dur);
         scheduledIntervals.push(setTimeout(windDrift, dur * 1000));
       };
       scheduledIntervals.push(setTimeout(windDrift, 0));
