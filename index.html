@@ -1098,10 +1098,10 @@
   // module below). Add a new one by giving it an id/label here and a
   // builder function in BUILDERS.
   const SOUND_PROFILES = [
-    { id: "rain", label: "🌧 雨声 Rain" },
-    { id: "ocean", label: "🌊 海浪 Ocean" },
-    { id: "snow", label: "❄️ 雪 Snow" },
+    { id: "river", label: "🏞 溪流 River" },
     { id: "bowl", label: "🔔 颂钵 Singing bowl" },
+    { id: "garden", label: "🎋 日式庭院 Japanese garden" },
+    { id: "purr", label: "🐱 猫咪呼噜 Cat purr" },
   ];
 
   const TIMER_OPTIONS = [
@@ -1978,53 +1978,46 @@
       scheduledIntervals = [];
     }
 
-    function buildRain(c, out) {
-      // Two independently-looping noise beds at different, non-matching
-      // lengths (7s / 11s) so their combined texture never lines up on a
-      // short, noticeable cycle — a steady "hiss" floor for the rain.
+    function buildRiver(c, out) {
+      // Two overlapping filtered-noise beds at non-matching loop lengths
+      // (8s / 13s), tuned into the "babbling brook" band (900-2200Hz)
+      // rather than the deep broadband rumble a waterfall would need —
+      // this is what keeps it reading as a small stream, not rapids.
       const bedA = track(c.createBufferSource());
-      bedA.buffer = noiseBuffer(c, 7);
+      bedA.buffer = noiseBuffer(c, 8);
       bedA.loop = true;
       const bedAFilter = track(c.createBiquadFilter());
       bedAFilter.type = "bandpass";
-      bedAFilter.frequency.value = 3200;
-      bedAFilter.Q.value = 0.6;
+      bedAFilter.frequency.value = 1100;
+      bedAFilter.Q.value = 0.7;
       const bedAGain = track(c.createGain());
-      bedAGain.gain.value = 0.28;
+      bedAGain.gain.value = 0.22;
       bedA.connect(bedAFilter); bedAFilter.connect(bedAGain); bedAGain.connect(out);
 
       const bedB = track(c.createBufferSource());
-      bedB.buffer = noiseBuffer(c, 11);
+      bedB.buffer = noiseBuffer(c, 13);
       bedB.loop = true;
       const bedBFilter = track(c.createBiquadFilter());
       bedBFilter.type = "bandpass";
-      bedBFilter.frequency.value = 5200;
-      bedBFilter.Q.value = 0.5;
+      bedBFilter.frequency.value = 1900;
+      bedBFilter.Q.value = 0.6;
       const bedBGain = track(c.createGain());
-      bedBGain.gain.value = 0.18;
+      bedBGain.gain.value = 0.14;
       bedB.connect(bedBFilter); bedBFilter.connect(bedBGain); bedBGain.connect(out);
 
       bedA.start(); bedB.start();
 
-      // Overall breathing: rather than a fixed-rate sine LFO (which reads
-      // as an obvious loop once you notice it), randomly ramp the bed
-      // toward a new target level over a random duration, then pick the
-      // next target — an organic drift that never repeats on a fixed
-      // cycle. `intensity` also drives the raindrop density below, so the
-      // whole texture surges and eases together.
-      let intensity = 0.85;
-      const breathe = () => {
-        if (!isPlaying || currentSound !== "rain") return;
-        intensity = 0.55 + Math.random() * 0.55;
+      // Slowly wander bedA's filter center frequency, like water shifting
+      // which stones it's running over — a moving filter reads as "flow",
+      // a fixed one reads as a static hiss.
+      const wander = () => {
+        if (!isPlaying || currentSound !== "river") return;
         const now = c.currentTime;
-        const dur = 4 + Math.random() * 5;
-        bedAGain.gain.cancelScheduledValues(now);
-        bedAGain.gain.setValueAtTime(bedAGain.gain.value, now);
-        bedAGain.gain.linearRampToValueAtTime(0.28 * intensity, now + dur);
-        bedBGain.gain.cancelScheduledValues(now);
-        bedBGain.gain.setValueAtTime(bedBGain.gain.value, now);
-        bedBGain.gain.linearRampToValueAtTime(0.18 * intensity, now + dur);
-        scheduledIntervals.push(setTimeout(breathe, dur * 1000));
+        const dur = 5 + Math.random() * 7;
+        bedAFilter.frequency.cancelScheduledValues(now);
+        bedAFilter.frequency.setValueAtTime(bedAFilter.frequency.value, now);
+        bedAFilter.frequency.linearRampToValueAtTime(800 + Math.random() * 700, now + dur);
+        scheduledIntervals.push(setTimeout(wander, dur * 1000));
       };
       // Deferred, not called directly: Ambient.play() sets isPlaying = true
       // only *after* build() returns, and these self-rescheduling
@@ -2032,229 +2025,278 @@
       // direct synchronous call here would run before that flag flips and
       // silently never reschedule itself again. setTimeout(fn, 0) defers
       // to right after play() finishes, once isPlaying is actually true.
-      scheduledIntervals.push(setTimeout(breathe, 0));
+      scheduledIntervals.push(setTimeout(wander, 0));
 
-      // Individual raindrops: short, randomly-pitched ticks at randomized
-      // intervals — never a fixed rhythm — whose average rate rises and
-      // falls with `intensity` so density visibly changes over time.
-      const drop = () => {
-        if (!isPlaying || currentSound !== "rain") return;
-        const dropSrc = c.createBufferSource();
-        dropSrc.buffer = noiseBuffer(c, 0.05);
-        const dropFilter = c.createBiquadFilter();
-        dropFilter.type = "bandpass";
-        dropFilter.frequency.value = 2500 + Math.random() * 3500;
-        dropFilter.Q.value = 3 + Math.random() * 3;
-        const dropGain = c.createGain();
-        dropGain.gain.value = 0;
-        dropSrc.connect(dropFilter); dropFilter.connect(dropGain); dropGain.connect(out);
-        const now = c.currentTime;
-        const peak = (0.03 + Math.random() * 0.05) * intensity;
-        dropGain.gain.setValueAtTime(0, now);
-        dropGain.gain.linearRampToValueAtTime(peak, now + 0.004);
-        dropGain.gain.exponentialRampToValueAtTime(0.0005, now + 0.04 + Math.random() * 0.03);
-        dropSrc.start(now);
-        dropSrc.stop(now + 0.09);
-
-        scheduledIntervals.push(setTimeout(drop, (30 + Math.random() * 90) / intensity));
-      };
-      scheduledIntervals.push(setTimeout(drop, 0));
-
-      // Distant thunder: rare, slow, low-frequency rumble.
-      const thunder = () => {
-        if (!isPlaying || currentSound !== "rain") return;
-        const dur = 1.8 + Math.random() * 1.8;
-        const rumbleSrc = c.createBufferSource();
-        rumbleSrc.buffer = noiseBuffer(c, dur);
-        const rumbleFilter = c.createBiquadFilter();
-        rumbleFilter.type = "lowpass";
-        rumbleFilter.frequency.value = 120 + Math.random() * 100;
-        const rumbleGain = c.createGain();
-        rumbleGain.gain.value = 0;
-        rumbleSrc.connect(rumbleFilter); rumbleFilter.connect(rumbleGain); rumbleGain.connect(out);
-        const now = c.currentTime;
-        const peak = 0.1 + Math.random() * 0.1;
-        rumbleGain.gain.setValueAtTime(0, now);
-        rumbleGain.gain.linearRampToValueAtTime(peak, now + dur * 0.3);
-        rumbleGain.gain.exponentialRampToValueAtTime(0.0005, now + dur);
-        rumbleSrc.start(now);
-        rumbleSrc.stop(now + dur + 0.1);
-
-        scheduledIntervals.push(setTimeout(thunder, 22000 + Math.random() * 45000));
-      };
-      scheduledIntervals.push(setTimeout(thunder, 8000 + Math.random() * 15000));
-
-      out.gain.value = 1;
-    }
-
-    function buildOcean(c, out) {
-      const src = track(c.createBufferSource());
-      src.buffer = noiseBuffer(c, 9);
-      src.loop = true;
-      const lp = track(c.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = 750;
-      const waveGain = track(c.createGain());
-      waveGain.gain.value = 0;
-      src.connect(lp); lp.connect(waveGain); waveGain.connect(out);
-      src.start();
-
-      // Each wave is its own randomized envelope — 6-10s, its own peak
-      // volume and rise/fall shape — so no two waves are identical and
-      // there's no fixed cycle to notice.
-      const nextWave = () => {
-        if (!isPlaying || currentSound !== "ocean") return;
-        const duration = 6 + Math.random() * 4;
-        const peak = 0.45 + Math.random() * 0.35;
-        const riseFrac = 0.35 + Math.random() * 0.15;
-        const now = c.currentTime;
-        waveGain.gain.cancelScheduledValues(now);
-        waveGain.gain.setValueAtTime(waveGain.gain.value, now);
-        waveGain.gain.linearRampToValueAtTime(peak, now + duration * riseFrac);
-        waveGain.gain.linearRampToValueAtTime(0.05 + Math.random() * 0.05, now + duration);
-        scheduledIntervals.push(setTimeout(nextWave, duration * 1000));
-      };
-      // Deferred — see the comment in buildRain's breathe() above: play()
-      // sets isPlaying = true only after build() returns.
-      scheduledIntervals.push(setTimeout(nextWave, 0));
-
-      // Distant wind layer — a quieter, brighter noise bed with its own
-      // slow, independent drift so it never lines up with the wave cycle.
-      const windSrc = track(c.createBufferSource());
-      windSrc.buffer = noiseBuffer(c, 13);
-      windSrc.loop = true;
-      const windFilter = track(c.createBiquadFilter());
-      windFilter.type = "bandpass";
-      windFilter.frequency.value = 900;
-      windFilter.Q.value = 0.4;
-      const windGain = track(c.createGain());
-      windGain.gain.value = 0.08;
-      windSrc.connect(windFilter); windFilter.connect(windGain); windGain.connect(out);
-      windSrc.start();
-
-      const windDrift = () => {
-        if (!isPlaying || currentSound !== "ocean") return;
-        const now = c.currentTime;
-        const dur = 6 + Math.random() * 8;
-        windGain.gain.cancelScheduledValues(now);
-        windGain.gain.setValueAtTime(windGain.gain.value, now);
-        windGain.gain.linearRampToValueAtTime(0.04 + Math.random() * 0.09, now + dur);
-        scheduledIntervals.push(setTimeout(windDrift, dur * 1000));
-      };
-      scheduledIntervals.push(setTimeout(windDrift, 0));
-
-      out.gain.value = 1;
-    }
-
-    function buildSnow(c, out) {
-      // Noise bed pushed well above the old 380Hz lowpass (which read as a
-      // low hum) and highpassed from below too — an airy hiss with the
-      // bass content stripped out, not a rumble.
-      const bed = track(c.createBufferSource());
-      bed.buffer = noiseBuffer(c, 10);
-      bed.loop = true;
-      const bedHp = track(c.createBiquadFilter()); bedHp.type = "highpass"; bedHp.frequency.value = 250;
-      const bedLp = track(c.createBiquadFilter()); bedLp.type = "lowpass"; bedLp.frequency.value = 900;
-      const bedGain = track(c.createGain());
-      bedGain.gain.value = 0.14;
-      bed.connect(bedHp); bedHp.connect(bedLp); bedLp.connect(bedGain); bedGain.connect(out);
-      bed.start();
-
-      // `intensity` drives the bed level *and* the patter/speck rates below
-      // together, so quiet lulls and denser flurries read as one
-      // coordinated swing rather than independently-drifting layers — this
-      // is what makes the density change actually noticeable.
-      let intensity = 0.8;
+      // Overall breathing: organic random-drift levels, same approach used
+      // by the other ambient beds — `intensity` also drives the bubble and
+      // rain-drop rates below, so the whole texture surges and eases
+      // together.
+      let intensity = 0.85;
       const breathe = () => {
-        if (!isPlaying || currentSound !== "snow") return;
-        intensity = 0.45 + Math.random() * 0.9;
+        if (!isPlaying || currentSound !== "river") return;
+        intensity = 0.6 + Math.random() * 0.5;
         const now = c.currentTime;
-        const dur = 6 + Math.random() * 8;
-        bedGain.gain.cancelScheduledValues(now);
-        bedGain.gain.setValueAtTime(bedGain.gain.value, now);
-        bedGain.gain.linearRampToValueAtTime(0.14 * intensity, now + dur);
+        const dur = 5 + Math.random() * 6;
+        bedAGain.gain.cancelScheduledValues(now);
+        bedAGain.gain.setValueAtTime(bedAGain.gain.value, now);
+        bedAGain.gain.linearRampToValueAtTime(0.22 * intensity, now + dur);
+        bedBGain.gain.cancelScheduledValues(now);
+        bedBGain.gain.setValueAtTime(bedBGain.gain.value, now);
+        bedBGain.gain.linearRampToValueAtTime(0.14 * intensity, now + dur);
         scheduledIntervals.push(setTimeout(breathe, dur * 1000));
       };
-      // Deferred — see the comment in buildRain's breathe() above.
       scheduledIntervals.push(setTimeout(breathe, 0));
 
-      // The 淅淅沥沥 patter: a dense stream of very light, short, high
-      // grains — this is the layer the old sparse "specks" (below) were
-      // missing. Its rate scales inversely with `intensity` (like rain's
-      // drops), so it visibly thickens into a patter and thins back out
-      // instead of sitting at one constant average density.
-      const patter = () => {
-        if (!isPlaying || currentSound !== "snow") return;
+      // Bubbling "plinks" — short resonant blips as the water trips over
+      // stones, at randomized pitch and irregular spacing.
+      const bubble = () => {
+        if (!isPlaying || currentSound !== "river") return;
         const src = c.createBufferSource();
-        src.buffer = noiseBuffer(c, 0.03);
+        src.buffer = noiseBuffer(c, 0.06);
         const filter = c.createBiquadFilter();
         filter.type = "bandpass";
-        filter.frequency.value = 2800 + Math.random() * 3200;
-        filter.Q.value = 3 + Math.random() * 5;
+        filter.frequency.value = 1400 + Math.random() * 2200;
+        filter.Q.value = 4 + Math.random() * 6;
         const gain = c.createGain();
         gain.gain.value = 0;
         src.connect(filter); filter.connect(gain); gain.connect(out);
         const now = c.currentTime;
-        const peak = (0.006 + Math.random() * 0.014) * intensity;
+        const peak = (0.02 + Math.random() * 0.035) * intensity;
         gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(peak, now + 0.003);
-        gain.gain.exponentialRampToValueAtTime(0.0003, now + 0.025 + Math.random() * 0.02);
+        gain.gain.linearRampToValueAtTime(peak, now + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0004, now + 0.05 + Math.random() * 0.06);
         src.start(now);
-        src.stop(now + 0.06);
+        src.stop(now + 0.15);
 
-        scheduledIntervals.push(setTimeout(patter, (18 + Math.random() * 55) / intensity));
+        scheduledIntervals.push(setTimeout(bubble, (60 + Math.random() * 180) / intensity));
       };
-      scheduledIntervals.push(setTimeout(patter, 0));
+      scheduledIntervals.push(setTimeout(bubble, 0));
 
-      // Occasional heavier flake ticks poking through the patter, so the
-      // texture doesn't read as one uniform grain — sparse and irregular,
-      // rate also following `intensity`.
-      const speck = () => {
-        if (!isPlaying || currentSound !== "snow") return;
-        const speckSrc = c.createBufferSource();
-        speckSrc.buffer = noiseBuffer(c, 0.05);
-        const speckFilter = c.createBiquadFilter();
-        speckFilter.type = "bandpass";
-        speckFilter.frequency.value = 1600 + Math.random() * 1800;
-        speckFilter.Q.value = 4 + Math.random() * 4;
-        const speckGain = c.createGain();
-        speckGain.gain.value = 0;
-        speckSrc.connect(speckFilter); speckFilter.connect(speckGain); speckGain.connect(out);
+      // A light rain layer over the stream, per the reference mix — kept
+      // sparse and quiet, never louder than the water itself.
+      const drop = () => {
+        if (!isPlaying || currentSound !== "river") return;
+        const src = c.createBufferSource();
+        src.buffer = noiseBuffer(c, 0.05);
+        const filter = c.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.value = 3000 + Math.random() * 3500;
+        filter.Q.value = 3 + Math.random() * 3;
+        const gain = c.createGain();
+        gain.gain.value = 0;
+        src.connect(filter); filter.connect(gain); gain.connect(out);
         const now = c.currentTime;
-        const peak = (0.02 + Math.random() * 0.025) * intensity;
-        speckGain.gain.setValueAtTime(0, now);
-        speckGain.gain.linearRampToValueAtTime(peak, now + 0.006);
-        speckGain.gain.exponentialRampToValueAtTime(0.0004, now + 0.05);
-        speckSrc.start(now);
-        speckSrc.stop(now + 0.1);
+        const peak = (0.012 + Math.random() * 0.02) * intensity;
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(peak, now + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.0004, now + 0.04 + Math.random() * 0.03);
+        src.start(now);
+        src.stop(now + 0.09);
 
-        scheduledIntervals.push(setTimeout(speck, (900 + Math.random() * 2200) / intensity));
+        scheduledIntervals.push(setTimeout(drop, (200 + Math.random() * 500) / intensity));
       };
-      scheduledIntervals.push(setTimeout(speck, 1200 + Math.random() * 1500));
+      scheduledIntervals.push(setTimeout(drop, 0));
 
-      // Distant wind, pushed higher so it stays airy instead of adding to
-      // the low end — drifts in and out of audibility rather than a
-      // steady presence.
-      const windSrc = track(c.createBufferSource());
-      windSrc.buffer = noiseBuffer(c, 14);
-      windSrc.loop = true;
-      const windFilter = track(c.createBiquadFilter());
-      windFilter.type = "bandpass";
-      windFilter.frequency.value = 750;
-      windFilter.Q.value = 0.5;
-      const windGain = track(c.createGain());
-      windGain.gain.value = 0;
-      windSrc.connect(windFilter); windFilter.connect(windGain); windGain.connect(out);
-      windSrc.start();
+      out.gain.value = 1;
+    }
 
-      const windDrift = () => {
-        if (!isPlaying || currentSound !== "snow") return;
+    function buildJapaneseGarden(c, out) {
+      // Quiet flowing-water bed underneath everything else — subtler than
+      // the river sound above since here it's one layer among several, not
+      // the main event.
+      const streamSrc = track(c.createBufferSource());
+      streamSrc.buffer = noiseBuffer(c, 10);
+      streamSrc.loop = true;
+      const streamFilter = track(c.createBiquadFilter());
+      streamFilter.type = "bandpass";
+      streamFilter.frequency.value = 1300;
+      streamFilter.Q.value = 0.6;
+      const streamGain = track(c.createGain());
+      streamGain.gain.value = 0.1;
+      streamSrc.connect(streamFilter); streamFilter.connect(streamGain); streamGain.connect(out);
+      streamSrc.start();
+
+      const streamDrift = () => {
+        if (!isPlaying || currentSound !== "garden") return;
         const now = c.currentTime;
-        const dur = 8 + Math.random() * 10;
-        windGain.gain.cancelScheduledValues(now);
-        windGain.gain.setValueAtTime(windGain.gain.value, now);
-        windGain.gain.linearRampToValueAtTime(Math.random() < 0.4 ? 0 : 0.015 + Math.random() * 0.035, now + dur);
-        scheduledIntervals.push(setTimeout(windDrift, dur * 1000));
+        const dur = 6 + Math.random() * 8;
+        streamGain.gain.cancelScheduledValues(now);
+        streamGain.gain.setValueAtTime(streamGain.gain.value, now);
+        streamGain.gain.linearRampToValueAtTime(0.06 + Math.random() * 0.07, now + dur);
+        scheduledIntervals.push(setTimeout(streamDrift, dur * 1000));
       };
-      scheduledIntervals.push(setTimeout(windDrift, 0));
+      // Deferred — see the comment in buildRiver's wander() above: play()
+      // sets isPlaying = true only after build() returns.
+      scheduledIntervals.push(setTimeout(streamDrift, 0));
+
+      // Shishi-odoshi (鹿威し) bamboo fountain: a long, irregular fill-and-
+      // tip cycle ending in a single low woody "thonk" — a short noise
+      // transient plus a fast-decaying low sine, fired at random long
+      // intervals rather than a repeating loop.
+      const bambooKnock = () => {
+        if (!isPlaying || currentSound !== "garden") return;
+        const now = c.currentTime;
+        const clickSrc = c.createBufferSource();
+        clickSrc.buffer = noiseBuffer(c, 0.05);
+        const clickFilter = c.createBiquadFilter();
+        clickFilter.type = "bandpass";
+        clickFilter.frequency.value = 900;
+        clickFilter.Q.value = 2;
+        const clickGain = c.createGain();
+        clickGain.gain.setValueAtTime(0.16, now);
+        clickGain.gain.exponentialRampToValueAtTime(0.0005, now + 0.06);
+        clickSrc.connect(clickFilter); clickFilter.connect(clickGain); clickGain.connect(out);
+        clickSrc.start(now); clickSrc.stop(now + 0.08);
+
+        const thonk = c.createOscillator();
+        thonk.type = "sine";
+        thonk.frequency.setValueAtTime(210, now);
+        thonk.frequency.exponentialRampToValueAtTime(140, now + 0.25);
+        const thonkGain = c.createGain();
+        thonkGain.gain.setValueAtTime(0.22, now);
+        thonkGain.gain.exponentialRampToValueAtTime(0.0005, now + 0.7);
+        thonk.connect(thonkGain); thonkGain.connect(out);
+        thonk.start(now); thonk.stop(now + 0.8);
+
+        scheduledIntervals.push(setTimeout(bambooKnock, 14000 + Math.random() * 26000));
+      };
+      scheduledIntervals.push(setTimeout(bambooKnock, 6000 + Math.random() * 10000));
+
+      // Wind chimes (風鈴): a small pentatonic-ish set of bell tones. Wind
+      // gusts arrive as short clusters of 1-4 chimes rather than isolated
+      // notes, at a random pitch each time, then go quiet for a while.
+      const chimeScale = [880, 990, 1175, 1320, 1568, 1760];
+      const chime = (when) => {
+        if (!isPlaying || currentSound !== "garden") return;
+        const now = when;
+        const freq = chimeScale[Math.floor(Math.random() * chimeScale.length)];
+        const osc = c.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const overtone = c.createOscillator();
+        overtone.type = "sine";
+        overtone.frequency.value = freq * 2.4;
+        const overtoneGain = c.createGain();
+        overtoneGain.gain.value = 0.15;
+        overtone.connect(overtoneGain);
+        const gain = c.createGain();
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.05 + Math.random() * 0.05, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0004, now + 2.5 + Math.random() * 1.5);
+        osc.connect(gain); overtoneGain.connect(gain); gain.connect(out);
+        osc.start(now); overtone.start(now);
+        osc.stop(now + 4.2); overtone.stop(now + 4.2);
+      };
+      const chimeGust = () => {
+        if (!isPlaying || currentSound !== "garden") return;
+        const strikes = 1 + Math.floor(Math.random() * 4);
+        const now = c.currentTime;
+        for (let i = 0; i < strikes; i++) {
+          chime(now + i * (0.25 + Math.random() * 0.4));
+        }
+        scheduledIntervals.push(setTimeout(chimeGust, 10000 + Math.random() * 25000));
+      };
+      scheduledIntervals.push(setTimeout(chimeGust, 5000 + Math.random() * 8000));
+
+      // Occasional bird calls: a couple of short pitch-swept chirps, kept
+      // very sparse so the garden reads as quiet, not busy.
+      const bird = () => {
+        if (!isPlaying || currentSound !== "garden") return;
+        const now = c.currentTime;
+        const chirps = 1 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < chirps; i++) {
+          const start = now + i * (0.12 + Math.random() * 0.1);
+          const osc = c.createOscillator();
+          osc.type = "sine";
+          const base = 2600 + Math.random() * 1400;
+          osc.frequency.setValueAtTime(base, start);
+          osc.frequency.exponentialRampToValueAtTime(base * (1.3 + Math.random() * 0.4), start + 0.05);
+          osc.frequency.exponentialRampToValueAtTime(base * 0.8, start + 0.11);
+          const gain = c.createGain();
+          gain.gain.setValueAtTime(0, start);
+          gain.gain.linearRampToValueAtTime(0.05 + Math.random() * 0.03, start + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.0004, start + 0.13);
+          osc.connect(gain); gain.connect(out);
+          osc.start(start); osc.stop(start + 0.15);
+        }
+        scheduledIntervals.push(setTimeout(bird, 18000 + Math.random() * 40000));
+      };
+      scheduledIntervals.push(setTimeout(bird, 9000 + Math.random() * 15000));
+
+      out.gain.value = 1;
+    }
+
+    function buildCatPurr(c, out) {
+      // A cat's purr comes from laryngeal muscle twitching at roughly
+      // 25-50Hz during both inhale and exhale. A sawtooth (not sine)
+      // carrier gives it the buzzy harmonic content a purr actually has,
+      // low-passed so it stays a felt rumble rather than an audible tone.
+      const carrier = track(c.createOscillator());
+      carrier.type = "sawtooth";
+      carrier.frequency.value = 32;
+      const carrierLp = track(c.createBiquadFilter());
+      carrierLp.type = "lowpass";
+      carrierLp.frequency.value = 220;
+      carrier.connect(carrierLp);
+
+      // Slowly wander the fundamental within the 25-50Hz purr range so the
+      // pitch never sits perfectly still.
+      const pitchWander = () => {
+        if (!isPlaying || currentSound !== "purr") return;
+        const now = c.currentTime;
+        const dur = 6 + Math.random() * 8;
+        carrier.frequency.cancelScheduledValues(now);
+        carrier.frequency.setValueAtTime(carrier.frequency.value, now);
+        carrier.frequency.linearRampToValueAtTime(25 + Math.random() * 25, now + dur);
+        scheduledIntervals.push(setTimeout(pitchWander, dur * 1000));
+      };
+      // Deferred — see the comment in buildRiver's wander() above.
+      scheduledIntervals.push(setTimeout(pitchWander, 0));
+
+      // The "chugging" texture: an AM tremolo roughly double the purr rate
+      // (one pulse per inhale, one per exhale each cycle) is what actually
+      // makes this read as a purr instead of a plain low tone.
+      const chugGain = track(c.createGain());
+      chugGain.gain.value = 0.5;
+      const chugLfo = track(c.createOscillator());
+      chugLfo.type = "sine";
+      chugLfo.frequency.value = 58;
+      const chugDepth = track(c.createGain());
+      chugDepth.gain.value = 0.5;
+      chugLfo.connect(chugDepth); chugDepth.connect(chugGain.gain);
+      carrierLp.connect(chugGain);
+
+      // Filtered noise "grain" adds the rasp of real vocal-fold contact
+      // instead of a clean electronic buzz, run through the same tremolo.
+      const grain = track(c.createBufferSource());
+      grain.buffer = noiseBuffer(c, 6);
+      grain.loop = true;
+      const grainLp = track(c.createBiquadFilter());
+      grainLp.type = "lowpass";
+      grainLp.frequency.value = 140;
+      const grainGain = track(c.createGain());
+      grainGain.gain.value = 0.15;
+      grain.connect(grainLp); grainLp.connect(grainGain); grainGain.connect(chugGain);
+
+      // Overall breathing envelope — a slow, irregular inhale/exhale swell
+      // layered on top of the fast chugging, so the purr rises and falls
+      // in intensity instead of sitting at one flat level.
+      const breatheGain = track(c.createGain());
+      breatheGain.gain.value = 0.5;
+      chugGain.connect(breatheGain); breatheGain.connect(out);
+
+      const breathe = () => {
+        if (!isPlaying || currentSound !== "purr") return;
+        const now = c.currentTime;
+        const dur = 3 + Math.random() * 3.5;
+        breatheGain.gain.cancelScheduledValues(now);
+        breatheGain.gain.setValueAtTime(breatheGain.gain.value, now);
+        breatheGain.gain.linearRampToValueAtTime(0.35 + Math.random() * 0.35, now + dur);
+        scheduledIntervals.push(setTimeout(breathe, dur * 1000));
+      };
+      scheduledIntervals.push(setTimeout(breathe, 0));
+
+      carrier.start(); chugLfo.start(); grain.start();
 
       out.gain.value = 1;
     }
@@ -2333,7 +2375,7 @@
       out.gain.value = 1;
     }
 
-    const BUILDERS = { rain: buildRain, ocean: buildOcean, snow: buildSnow, bowl: buildSingingBowl };
+    const BUILDERS = { river: buildRiver, bowl: buildSingingBowl, garden: buildJapaneseGarden, purr: buildCatPurr };
 
     function build(type) {
       const c = ensureCtx();
@@ -2341,7 +2383,7 @@
       const out = track(c.createGain());
       out.gain.value = 1;
       out.connect(masterGain);
-      (BUILDERS[type] || buildRain)(c, out);
+      (BUILDERS[type] || buildRiver)(c, out);
       currentSound = type;
     }
 
