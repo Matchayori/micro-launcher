@@ -12,6 +12,7 @@
     --bg: #f6f5f1;
     --bg-soft: #efeee8;
     --card: rgba(255, 255, 255, 0.72);
+    --header-glass: rgba(255, 255, 255, 0.9);
     --border: #e3e1d8;
     --text: #2f3430;
     --text-soft: #6b7268;
@@ -30,6 +31,7 @@
       --bg: #1c1e1c;
       --bg-soft: #23261f;
       --card: rgba(38, 42, 37, 0.74);
+      --header-glass: rgba(22, 24, 20, 0.88);
       --border: #383c34;
       --text: #e8e6de;
       --text-soft: #a3a89c;
@@ -135,9 +137,9 @@
   }
 
   .header-text {
-    background: var(--card);
-    backdrop-filter: blur(14px) saturate(160%);
-    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    background: var(--header-glass);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
     border-radius: var(--radius);
     padding: 12px 16px;
   }
