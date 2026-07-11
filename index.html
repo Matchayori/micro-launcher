@@ -9,53 +9,33 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f6f5f1;
-    --bg-soft: #efeee8;
-    --card: rgba(255, 255, 255, 0.72);
-    --header-glass: rgba(255, 255, 255, 0.96);
-    --border: #e3e1d8;
-    --text: #2f3430;
-    --text-soft: #6b7268;
-    --accent: #6b9080;
-    --accent-soft: #a4c3b2;
-    --accent-bg: #eaf2ee;
-    --warn-bg: #fbeee9;
-    --warn-text: #a1543a;
+    /* Unified glass-over-sunset-sea palette — one look regardless of OS
+       light/dark preference, since the backdrop itself (WebGL shader or
+       its static fallback) is a fixed warm-to-teal sunset scene, not a
+       theme that flips with the system setting. */
+    --bg: #4A6060;
+    --bg-soft: rgba(255, 255, 255, 0.12);
+    --card: rgba(196, 168, 130, 0.25);
+    --header-glass: rgba(61, 43, 31, 0.35);
+    --border: rgba(196, 168, 130, 0.2);
+    --text: #F0EAE0;
+    --text-soft: rgba(240, 234, 224, 0.6);
+    --accent: #C4A882;
+    --accent-soft: rgba(196, 168, 130, 0.5);
+    --accent-bg: rgba(196, 168, 130, 0.15);
+    --warn-bg: rgba(139, 26, 43, 0.18);
+    --warn-text: #E0A389;
     --radius: 16px;
-    --shadow: 0 2px 10px rgba(60, 60, 50, 0.06);
+    --shadow: 0 4px 22px rgba(20, 10, 5, 0.3);
     font-size: 17px;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1c1e1c;
-      --bg-soft: #23261f;
-      --card: rgba(38, 42, 37, 0.74);
-      --header-glass: rgba(20, 22, 18, 0.95);
-      --border: #383c34;
-      --text: #e8e6de;
-      --text-soft: #a3a89c;
-      --accent: #8fb9a5;
-      --accent-soft: #4d6058;
-      --accent-bg: #2b3530;
-      --warn-bg: #3a2b24;
-      --warn-text: #e0a389;
-      --shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
-    }
-  }
-
-  /* Static fallback background — colors lifted straight from the WebGL
-     shader's skyCol1/seaCol1 uniforms so the two modes match at a glance. */
+  /* Static fallback background when the WebGL shader is off. */
   #staticBg {
     position: fixed;
     inset: 0;
     z-index: -2;
-    background: linear-gradient(to bottom,
-      #99594d 0%,
-      #99594d 42%,
-      #46403a 50%,
-      #1a3333 58%,
-      #1a3333 100%);
+    background: linear-gradient(to bottom, #D4956A 0%, #4A6060 100%);
   }
 
   #bgCanvas {
@@ -71,17 +51,17 @@
     display: flex;
     align-items: center;
     gap: 7px;
-    background: var(--card);
+    background: rgba(196, 168, 130, 0.2);
     backdrop-filter: blur(14px) saturate(160%);
     -webkit-backdrop-filter: blur(14px) saturate(160%);
-    border: 1px solid var(--border);
+    border: 1px solid rgba(196, 168, 130, 0.25);
     border-radius: 12px;
     padding: 0 10px;
     height: 42px;
     flex: 0 0 auto;
     cursor: pointer;
     font-size: 1rem;
-    color: var(--text-soft);
+    color: rgba(240, 234, 224, 0.5);
     user-select: none;
   }
   .bg-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -138,8 +118,8 @@
 
   .header-text {
     background: var(--header-glass);
-    backdrop-filter: blur(28px) saturate(160%);
-    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
     border-radius: var(--radius);
     padding: 12px 16px;
   }
@@ -171,10 +151,10 @@
   }
 
   .icon-btn {
-    background: var(--card);
+    background: rgba(196, 168, 130, 0.2);
     backdrop-filter: blur(14px) saturate(160%);
     -webkit-backdrop-filter: blur(14px) saturate(160%);
-    border: 1px solid var(--border);
+    border: 1px solid rgba(196, 168, 130, 0.25);
     border-radius: 12px;
     width: 42px;
     height: 42px;
@@ -184,15 +164,15 @@
     justify-content: center;
     cursor: pointer;
     font-size: 1.15rem;
-    color: var(--text-soft);
+    color: rgba(240, 234, 224, 0.5);
     transition: background 0.15s, color 0.15s;
   }
   .icon-btn:hover { background: var(--accent-bg); color: var(--accent); }
 
   .card {
     background: var(--card);
-    backdrop-filter: blur(18px) saturate(160%);
-    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
@@ -219,14 +199,15 @@
     font-size: 0.98rem;
     padding: 12px 14px;
     border-radius: 12px;
-    border: 1px solid var(--border);
-    background: var(--bg-soft);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.12);
     color: var(--text);
     resize: vertical;
     outline: none;
     transition: border-color 0.15s;
   }
   textarea:focus, input:focus { border-color: var(--accent-soft); }
+  textarea::placeholder, input::placeholder { color: rgba(240, 234, 224, 0.5); }
 
   textarea#taskInput { min-height: 130px; }
   textarea#emailInlineInput { min-height: 90px; }
@@ -301,16 +282,16 @@
   }
   .chip {
     border: 1px solid var(--border);
-    background: var(--bg-soft);
-    color: var(--text-soft);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(240, 234, 224, 0.7);
     border-radius: 999px;
     padding: 6px 13px;
     font-size: 0.82rem;
     cursor: pointer;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
-  .chip:hover { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-soft); }
-  .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .chip:hover { background: var(--accent-bg); color: var(--text); border-color: var(--accent-soft); }
+  .chip.active { background: rgba(196, 168, 130, 0.25); color: #F0EAE0; border-color: var(--accent); }
 
   .templates-label {
     font-size: 0.78rem;
@@ -327,12 +308,12 @@
     display: block;
     width: 100%;
     text-align: left;
-    background: var(--bg-soft);
-    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 12px;
     padding: 12px 14px;
     font-size: 0.88rem;
-    color: var(--text-soft);
+    color: rgba(240, 234, 224, 0.8);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
   }
@@ -389,17 +370,13 @@
   .quadrant-cell:active { transform: scale(0.97); }
   .quadrant-emoji { font-size: 1.5rem; }
   .quadrant-label { font-weight: 500; }
-  .quadrant-urgent-important { background: #fbe4dd; border-color: #e3a08e; }
-  .quadrant-important-not-urgent { background: #fbf2d9; border-color: #d9c079; }
-  .quadrant-urgent-not-important { background: #fbe9d6; border-color: #e0b077; }
-  .quadrant-neither { background: #e5f0e8; border-color: var(--accent-soft); }
-
-  @media (prefers-color-scheme: dark) {
-    .quadrant-urgent-important { background: #4a2e28; border-color: #8a5346; }
-    .quadrant-important-not-urgent { background: #453f22; border-color: #8a7a3f; }
-    .quadrant-urgent-not-important { background: #453321; border-color: #8a6a3f; }
-    .quadrant-neither { background: #26332c; border-color: var(--accent-soft); }
-  }
+  /* Translucent glass tinted per quadrant, same hue-coding as before
+     (wine=urgent+important, gold=important, amber=urgent, teal=neither),
+     recolored so text stays legible against the now-light --text. */
+  .quadrant-urgent-important { background: rgba(139, 26, 43, 0.28); border-color: rgba(200, 150, 130, 0.35); }
+  .quadrant-important-not-urgent { background: rgba(196, 168, 130, 0.3); border-color: rgba(196, 168, 130, 0.4); }
+  .quadrant-urgent-not-important { background: rgba(212, 149, 106, 0.28); border-color: rgba(212, 149, 106, 0.4); }
+  .quadrant-neither { background: rgba(74, 96, 96, 0.35); border-color: rgba(140, 170, 170, 0.4); }
 
   .toggle-row {
     display: flex;
@@ -421,9 +398,11 @@
   button.primary {
     width: 100%;
     margin-top: 16px;
-    background: var(--accent);
-    color: #fff;
-    border: none;
+    background: rgba(139, 26, 43, 0.35);
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+    color: #F0EAE0;
+    border: 1px solid rgba(200, 150, 130, 0.25);
     border-radius: 12px;
     padding: 14px 18px;
     font-size: 1rem;
@@ -481,7 +460,12 @@
 
   /* Ambient sound panel */
   #ambientPanel { display: none; }
-  #ambientPanel.open { display: block; }
+  #ambientPanel.open {
+    display: block;
+    background: rgba(61, 43, 31, 0.2);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+  }
   #ambientPanel h2 { font-size: 1rem; margin: 0 0 14px; }
   #bowlStrikeBtn { margin-top: 8px; transition: transform 0.1s ease; }
   #bowlStrikeBtn.struck { animation: bowlStrikePulse 0.6s ease-out; }
