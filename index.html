@@ -11,7 +11,7 @@
   :root {
     --bg: #f6f5f1;
     --bg-soft: #efeee8;
-    --card: #ffffff;
+    --card: rgba(255, 255, 255, 0.72);
     --border: #e3e1d8;
     --text: #2f3430;
     --text-soft: #6b7268;
@@ -29,7 +29,7 @@
     :root {
       --bg: #1c1e1c;
       --bg-soft: #23261f;
-      --card: #262a25;
+      --card: rgba(38, 42, 37, 0.74);
       --border: #383c34;
       --text: #e8e6de;
       --text-soft: #a3a89c;
@@ -41,6 +41,71 @@
       --shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
     }
   }
+
+  /* Static fallback background — colors lifted straight from the WebGL
+     shader's skyCol1/seaCol1 uniforms so the two modes match at a glance. */
+  #staticBg {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background: linear-gradient(to bottom,
+      #99594d 0%,
+      #99594d 42%,
+      #46403a 50%,
+      #1a3333 58%,
+      #1a3333 100%);
+  }
+
+  #bgCanvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    display: none;
+  }
+
+  .bg-toggle {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--card);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0 10px;
+    height: 42px;
+    flex: 0 0 auto;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--text-soft);
+    user-select: none;
+  }
+  .bg-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .bg-toggle-track {
+    position: relative;
+    width: 32px;
+    height: 18px;
+    border-radius: 9px;
+    background: var(--border);
+    flex: 0 0 auto;
+    transition: background 0.15s;
+  }
+  .bg-toggle-track::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: transform 0.15s;
+  }
+  .bg-toggle input:checked + .bg-toggle-track { background: var(--accent); }
+  .bg-toggle input:checked + .bg-toggle-track::after { transform: translateX(14px); }
 
   * { box-sizing: border-box; }
 
@@ -67,6 +132,14 @@
     justify-content: space-between;
     gap: 16px;
     margin-bottom: 20px;
+  }
+
+  .header-text {
+    background: var(--card);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border-radius: var(--radius);
+    padding: 12px 16px;
   }
 
   h1 {
@@ -97,6 +170,8 @@
 
   .icon-btn {
     background: var(--card);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
     border: 1px solid var(--border);
     border-radius: 12px;
     width: 42px;
@@ -114,6 +189,8 @@
 
   .card {
     background: var(--card);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
@@ -166,6 +243,8 @@
     border-radius: 50%;
     border: 1px solid var(--border);
     background: var(--card);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
     color: var(--text-soft);
     cursor: pointer;
     display: flex;
@@ -599,6 +678,8 @@
     height: 100vh;
     width: min(400px, 100vw);
     background: var(--card);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
     border-left: 1px solid var(--border);
     box-shadow: -6px 0 28px rgba(0, 0, 0, 0.14);
     transform: translateX(100%);
@@ -740,15 +821,22 @@
 </style>
 </head>
 <body>
+<div id="staticBg"></div>
+<canvas id="bgCanvas" aria-hidden="true"></canvas>
 <div class="wrap">
 
   <header>
-    <div>
+    <div class="header-text">
       <h1>微启动器 Micro-Launcher</h1>
       <p>不一定是逃避，可能只是还没找到入口。<br>It's not always avoidance — sometimes you just need a way in.</p>
       <div class="streak" id="streakCounter"></div>
     </div>
     <div class="header-actions">
+      <label class="bg-toggle" id="bgToggleWrap" title="动态背景 Dynamic background — 开启后渲染 WebGL 日落海面，更耗电 / Renders a WebGL sunset-sea background when on (uses more power)">
+        <span aria-hidden="true">🌅</span>
+        <input type="checkbox" id="dynamicBgToggle">
+        <span class="bg-toggle-track"></span>
+      </label>
       <button class="icon-btn" id="historyToggle" title="历史记录 History">📋</button>
       <button class="icon-btn" id="ambientToggle" title="环境音 Ambient sound">🎧</button>
       <button class="icon-btn" id="settingsToggle" title="设置 Settings">⚙️</button>
@@ -953,6 +1041,7 @@
     micLang: "microLauncher_micLang",
     completions: "microLauncher_completions",
     history: "microLauncher_history",
+    dynamicBg: "microLauncher_dynamicBg",
   };
 
   const MODEL = "claude-sonnet-4-6";
@@ -1278,6 +1367,365 @@
       ? `🔥 今天突破了 ${count} 件事 / ${count} thing${count === 1 ? "" : "s"} started today`
       : "";
   }
+
+  // ---------------------------------------------------------------------
+  // Dynamic background — an optional full-screen WebGL sunset-sea shader,
+  // off by default (it's the one thing on this page that isn't cheap on
+  // battery). When off, #staticBg shows a plain gradient built from the
+  // same skyCol1/seaCol1 the shader uses, so both modes read as the same
+  // scene. The shader itself (sea/skyColor/mainImage) is adapted from a
+  // Shadertoy source under CC BY-NC-SA 3.0; color grading borrows from
+  // TDM's "Seascape" (https://www.shadertoy.com/view/Ms2SD1).
+  // ---------------------------------------------------------------------
+
+  const DynamicBg = (() => {
+    const VERTEX_SRC = `
+      attribute vec2 aPosition;
+      void main() {
+        gl_Position = vec4(aPosition, 0.0, 1.0);
+      }
+    `;
+
+    // Shadertoy-style fragment shader: iResolution/iTime are bound below,
+    // and mainImage() is called from main() the way Shadertoy's own runner
+    // does it. GLSL ES 1.00 (WebGL1) has no built-in tanh, so a numerically
+    // stable polyfill (exp(-2|x|) form — avoids overflow for the large k*h
+    // arguments the wave functions pass in) is defined before it's used.
+    const FRAGMENT_SRC = `
+      #ifdef GL_FRAGMENT_PRECISION_HIGH
+      precision highp float;
+      #else
+      precision mediump float;
+      #endif
+
+      uniform vec3 iResolution;
+      uniform float iTime;
+
+      #define PI  3.141592654
+      #define TAU (2.0*PI)
+
+      const float gravity = 1.0;
+      const float waterTension = 0.01;
+
+      const vec3 skyCol1 = vec3(0.6, 0.35, 0.3);
+      const vec3 skyCol2 = vec3(1.0, 0.3, 0.3);
+      const vec3 sunCol1 =  vec3(1.0,0.5,0.4);
+      const vec3 sunCol2 =  vec3(1.0,0.8,0.7);
+      const vec3 seaCol1 = vec3(0.1,0.2,0.2);
+      const vec3 seaCol2 = vec3(0.8,0.9,0.6);
+
+      float tanh(float x) {
+        float e = exp(-2.0 * abs(x));
+        float r = (1.0 - e) / (1.0 + e);
+        return x >= 0.0 ? r : -r;
+      }
+
+      vec2 wave(in float t, in float a, in float w, in float p) {
+        float x = t;
+        float y = a*sin(t*w + p);
+        return vec2(x, y);
+      }
+
+      vec2 dwave(in float t, in float a, in float w, in float p) {
+        float dx = 1.0;
+        float dy = a*w*cos(t*w + p);
+        return vec2(dx, dy);
+      }
+
+      vec2 gravityWave(in float t, in float a, in float k, in float h) {
+        float w = sqrt(gravity*k*tanh(k*h));
+        return wave(t, a ,k, w*iTime);
+      }
+
+      vec2 capillaryWave(in float t, in float a, in float k, in float h) {
+        float w = sqrt((gravity*k + waterTension*k*k*k)*tanh(k*h));
+        return wave(t, a, k, w*iTime);
+      }
+
+      vec2 gravityWaveD(in float t, in float a, in float k, in float h) {
+        float w = sqrt(gravity*k*tanh(k*h));
+        return dwave(t, a, k, w*iTime);
+      }
+
+      vec2 capillaryWaveD(in float t, in float a, in float k, in float h) {
+        float w = sqrt((gravity*k + waterTension*k*k*k)*tanh(k*h));
+        return dwave(t, a, k, w*iTime);
+      }
+
+      mat2 mrot(in float a) {
+        float c = cos(a);
+        float s = sin(a);
+        return mat2(c, s, -s, c);
+      }
+
+      mat2 mtrans(in mat2 m) {
+        return mat2(m[0][0], m[1][0], m[0][1], m[1][1]);
+      }
+
+      vec4 sea(in vec2 p, in float ia) {
+        float y = 0.0;
+        vec3 d = vec3(0.0);
+
+        float k = 1.0;
+        float kk = 1.3;
+        float a = ia*0.19;
+        float aa = 1.0/(kk*kk);
+
+        float h = 10.0;
+        p *= 0.5;
+
+        float angle = 0.0;
+
+        for (int i = 0; i < 3; ++i) {
+          mat2 fr = mrot(angle);
+          mat2 rr = mtrans(fr);
+          vec2 pp = fr*p;
+          y += gravityWave(pp.y + float(i), a, k, h).y;
+          vec2 dw = gravityWaveD(pp.y + float(i), a, k, h);
+
+          vec2 d2 = vec2(0.0, dw.x);
+          vec2 rd2 = rr*d2;
+
+          d += vec3(rd2.x, dw.y, rd2.y);
+
+          angle += float(i);
+          k *= kk;
+          a *= aa;
+        }
+
+        for (int i = 3; i < 7; ++i) {
+          mat2 fr = mrot(angle);
+          mat2 rr = mtrans(fr);
+          vec2 pp = fr*p;
+          y += capillaryWave(pp.y + float(i), a, k, h).y;
+          vec2 dw = capillaryWaveD(pp.y + float(i), a, k, h);
+
+          vec2 d2 = vec2(0.0, dw.x);
+          vec2 rd2 = rr*d2;
+
+          d += vec3(rd2.x, dw.y, rd2.y);
+
+          angle += float(i);
+          k *= kk;
+          a *= aa;
+        }
+
+        vec3 t = normalize(d);
+        vec3 nxz = normalize(vec3(t.z, 0.0, -t.x));
+        vec3 nor = cross(t, nxz);
+
+        return vec4(y, nor);
+      }
+
+      vec3 sunDirection() {
+        vec3 dir = normalize(vec3(0, 0.13, 1));
+        return dir;
+      }
+
+      vec3 skyColor(vec3 rd) {
+        vec3 sunDir = sunDirection();
+
+        float sunDot = max(dot(rd, sunDir), 0.0);
+
+        vec3 final = vec3(0.0);
+
+        final += mix(skyCol1, skyCol2, rd.y);
+
+        final += 0.5*sunCol1*pow(sunDot, 30.0);
+
+        final += 4.0*sunCol2*pow(sunDot, 300.0);
+
+        return final;
+      }
+
+      void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+        vec2 q=fragCoord.xy/iResolution.xy;
+        vec2 p = -1.0 + 2.0*q;
+        p.x *= iResolution.x/iResolution.y;
+
+        vec3 ro = vec3(0.0, 10.0, 0.0);
+        vec3 ww = normalize(vec3(0.0, -0.1, 1.0));
+        vec3 uu = normalize(cross( vec3(0.0,1.0,0.0), ww));
+        vec3 vv = normalize(cross(ww,uu));
+        vec3 rd = normalize(p.x*uu + p.y*vv + 2.5*ww);
+
+        vec3 col = vec3(0.0);
+
+        float dsea = (0.0 - ro.y)/rd.y;
+
+        vec3 sunDir = sunDirection();
+
+        vec3 sky = skyColor(rd);
+
+        if (dsea > 0.0) {
+          vec3 p = ro + dsea*rd;
+          vec4 s = sea(p.xz, 1.0);
+          float h = s.x;
+          vec3 nor = s.yzw;
+          nor = mix(nor, vec3(0.0, 1.0, 0.0), smoothstep(0.0, 200.0, dsea));
+
+          float fre = clamp(1.0 - dot(-nor,rd), 0.0, 1.0);
+          fre = pow(fre, 3.0);
+          float dif = mix(0.25, 1.0, max(dot(nor,sunDir), 0.0));
+
+          vec3 refl = skyColor(reflect(rd, nor));
+          vec3 refr = seaCol1 + dif*sunCol1*seaCol2*0.1;
+
+          col = mix(refr, 0.9*refl, fre);
+
+          float atten = max(1.0 - dot(dsea,dsea) * 0.001, 0.0);
+          col += seaCol2*(p.y - h) * 2.0 * atten;
+
+          col = mix(col, sky, 1.0 - exp(-0.01*dsea));
+
+        } else {
+          col = sky;
+        }
+
+        fragColor = vec4(col,1.0);
+      }
+
+      void main() {
+        mainImage(gl_FragColor, gl_FragCoord.xy);
+      }
+    `;
+
+    let canvas = null;
+    let gl = null;
+    let uResolutionLoc = null;
+    let uTimeLoc = null;
+    let rafId = null;
+    let startTime = null;
+    let enabled = false;
+    let unsupported = false;
+
+    function compileShader(type, src) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, src);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error("DynamicBg shader error:", gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    function initGL() {
+      canvas = $("bgCanvas");
+      gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+      if (!gl) return false;
+
+      const vs = compileShader(gl.VERTEX_SHADER, VERTEX_SRC);
+      const fs = compileShader(gl.FRAGMENT_SHADER, FRAGMENT_SRC);
+      if (!vs || !fs) return false;
+
+      const program = gl.createProgram();
+      gl.attachShader(program, vs);
+      gl.attachShader(program, fs);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error("DynamicBg link error:", gl.getProgramInfoLog(program));
+        return false;
+      }
+
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+
+      const aPositionLoc = gl.getAttribLocation(program, "aPosition");
+      uResolutionLoc = gl.getUniformLocation(program, "iResolution");
+      uTimeLoc = gl.getUniformLocation(program, "iTime");
+
+      gl.useProgram(program);
+      gl.enableVertexAttribArray(aPositionLoc);
+      gl.vertexAttribPointer(aPositionLoc, 2, gl.FLOAT, false, 0, 0);
+
+      // Falling back to the static gradient on context loss beats a frozen
+      // or black canvas — this page doesn't need the shader back badly
+      // enough to bother implementing full context restoration.
+      canvas.addEventListener("webglcontextlost", (e) => {
+        e.preventDefault();
+        stop();
+      });
+
+      return true;
+    }
+
+    function resize() {
+      if (!gl) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = Math.max(1, Math.floor(window.innerWidth * dpr));
+      const h = Math.max(1, Math.floor(window.innerHeight * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+        gl.viewport(0, 0, w, h);
+      }
+    }
+
+    function render(now) {
+      if (!enabled) return;
+      if (startTime === null) startTime = now;
+      resize();
+      gl.uniform3f(uResolutionLoc, canvas.width, canvas.height, 1.0);
+      gl.uniform1f(uTimeLoc, (now - startTime) / 1000);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      rafId = requestAnimationFrame(render);
+    }
+
+    function start() {
+      if (unsupported) return;
+      if (!gl && !initGL()) {
+        unsupported = true;
+        $("dynamicBgToggle").checked = false;
+        $("dynamicBgToggle").disabled = true;
+        $("bgToggleWrap").title = "此设备不支持 WebGL，无法显示动态背景 / WebGL isn't supported on this device";
+        localStorage.setItem(STORAGE_KEYS.dynamicBg, "0");
+        stop();
+        return;
+      }
+      enabled = true;
+      startTime = null;
+      canvas.style.display = "block";
+      $("staticBg").style.display = "none";
+      if (!rafId) rafId = requestAnimationFrame(render);
+    }
+
+    function stop() {
+      enabled = false;
+      if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+      if (canvas) canvas.style.display = "none";
+      $("staticBg").style.display = "block";
+    }
+
+    function setEnabled(v) {
+      localStorage.setItem(STORAGE_KEYS.dynamicBg, v ? "1" : "0");
+      if (v) start(); else stop();
+    }
+
+    function init() {
+      const toggle = $("dynamicBgToggle");
+      const wasEnabled = localStorage.getItem(STORAGE_KEYS.dynamicBg) === "1";
+      toggle.checked = wasEnabled;
+      toggle.addEventListener("change", () => setEnabled(toggle.checked));
+
+      window.addEventListener("resize", resize);
+      // Pause rendering in background tabs — no point burning battery on a
+      // canvas nobody can see.
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        } else if (enabled && !rafId) {
+          rafId = requestAnimationFrame(render);
+        }
+      });
+
+      if (wasEnabled) start(); else stop();
+    }
+
+    return { init };
+  })();
 
   // ---------------------------------------------------------------------
   // Shared AudioContext — Celebration, Ambient, and the singing-bowl
@@ -2999,6 +3447,7 @@
   renderMicLangOptions();
   Ambient.select(SOUND_PROFILES[0].id);
   renderStreak();
+  DynamicBg.init();
 
   if (!localStorage.getItem(STORAGE_KEYS.apiKey)) {
     setTimeout(() => {
