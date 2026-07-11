@@ -961,8 +961,7 @@
   <!-- Ambient sound -->
   <div class="card" id="ambientPanel">
     <h2>🎧 环境音 Ambient sound</h2>
-    <div class="hint">找点声音陪着你，帮自己更容易进入状态。所有声音都在浏览器里实时生成，不需要联网下载。<br>Some sound to ease you into the task — generated live in the browser, no downloads needed.</div>
-    <div class="hint" id="ambientBrowserHint" style="display:none;">⚠️ 在 Safari 上环境音可能播放不出声音，建议使用 Chrome。<br>Ambient sound may not play in Safari — Chrome is recommended.</div>
+    <div class="hint">找点声音陪着你，帮自己更容易进入状态。<br>Some sound to ease you into the task.</div>
 
     <div class="presets" id="ambientSounds"></div>
 
@@ -1094,14 +1093,15 @@
     { emoji: "🤷", zh: "说不清楚，就是不想动...", en: "I don't know, I just can't get going..." },
   ];
 
-  // Ambient sound profiles (all synthesized client-side — see the Ambient
-  // module below). Add a new one by giving it an id/label here and a
-  // builder function in BUILDERS.
+  // Ambient sound profiles — each maps to a local mp3 file played on loop
+  // (see the Ambient module below). Add a new one by giving it an id/label
+  // here and dropping the file alongside index.html.
   const SOUND_PROFILES = [
-    { id: "river", label: "🏞 溪流 River" },
-    { id: "bowl", label: "🔔 颂钵 Singing bowl" },
-    { id: "garden", label: "🎋 日式庭院 Japanese garden" },
-    { id: "purr", label: "🐱 猫咪呼噜 Cat purr" },
+    { id: "river", label: "🏞 溪流 River", file: "forest.mp3" },
+    { id: "bowl", label: "🔔 颂钵 Singing bowl", file: "singingbowl.mp3" },
+    { id: "garden", label: "🎋 日式庭院 Japanese garden", file: "music.mp3" },
+    { id: "purr", label: "🐱 猫咪呼噜 Cat purr", file: "purr.mp3" },
+    { id: "tango", label: "💃 探戈 Tango", file: "tango.mp3" },
   ];
 
   const TIMER_OPTIONS = [
@@ -1737,17 +1737,33 @@
   })();
 
   // ---------------------------------------------------------------------
-  // Shared AudioContext — Celebration, Ambient, and the singing-bowl
-  // strike used to each keep their own independent AudioContext. Safari
-  // has been seen behaving unpredictably — working sometimes, silently
-  // producing nothing other times — once more than one AudioContext is
-  // alive on the page at once, so all three now share a single context,
-  // unlocked once and reused everywhere instead of three separate ones
-  // competing for the same audio hardware.
+  // Shared AudioContext — used by Celebration and the singing-bowl single
+  // strike (the two remaining Web Audio API synths; the continuous ambient
+  // sounds are plain <audio> file playback now, see Ambient below). They
+  // used to each keep their own independent AudioContext, which Safari
+  // handled unpredictably — working sometimes, silently producing nothing
+  // other times — once more than one AudioContext was alive on the page at
+  // once, so both share a single context, unlocked once and reused instead
+  // of two separate ones competing for the same audio hardware.
   // ---------------------------------------------------------------------
 
   const SharedAudio = (() => {
     let ctx = null;
+
+    function unlockWithSilentBuffer(c) {
+      // Safari (desktop and iOS) has been seen reporting AudioContext state
+      // "running" — resume() resolved, no errors — while still producing
+      // no audible output, because resume() alone doesn't always open the
+      // OS-level audio session. Actually playing a real (if silent) buffer
+      // through to destination, synchronously in the same click that
+      // created/resumed the context, is the standard fix: it forces that
+      // session open instead of just flipping the context's own state flag.
+      const buffer = c.createBuffer(1, 1, c.sampleRate);
+      const src = c.createBufferSource();
+      src.buffer = buffer;
+      src.connect(c.destination);
+      src.start(0);
+    }
 
     function ensureCtx() {
       if (ctx && ctx.state === "closed") {
@@ -1759,7 +1775,17 @@
       }
       if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
       if (ctx.state !== "running") {
-        ctx.resume().catch((err) => {
+        // Both calls below must happen synchronously, right here, inside
+        // whatever click handler called ensureCtx() — that's what makes
+        // them count as "triggered by a user gesture" to the browser.
+        // Everything after this point (the .then chain) can run later.
+        unlockWithSilentBuffer(ctx);
+        ctx.resume().then(() => {
+          // Some Safari versions resolve resume() once without actually
+          // reaching "running" — give it one more nudge rather than
+          // silently leaving playback broken.
+          if (ctx.state !== "running") return ctx.resume();
+        }).catch((err) => {
           showError(`无法启动音频，请再试一次。/ Couldn't start audio — please try again. (${err && err.message ? err.message : err})`);
         });
       }
@@ -1928,15 +1954,29 @@
   }
 
   // ---------------------------------------------------------------------
-  // Ambient sound engine — procedurally generated via Web Audio API, so
-  // it always works fully offline. Add a new sound by adding an entry to
-  // SOUND_PROFILES above and a matching builder function in BUILDERS.
+  // Ambient sound engine — plain HTML5 <audio> elements playing local mp3
+  // files (see SOUND_PROFILES' `file` field), looped natively. No Web Audio
+  // API graph here at all: volume fades are done by ramping each element's
+  // own .volume directly. Add a new sound by adding a { id, label, file }
+  // entry to SOUND_PROFILES above — no builder function needed.
   // ---------------------------------------------------------------------
 
   const Ambient = (() => {
-    let masterGain = null;
-    let activeNodes = [];
-    let scheduledIntervals = [];
+    // One <audio> per profile, created up front but not fetched until
+    // .play() is actually called (preload="none") — these files are a few
+    // MB each and there's no reason to pull all of them on page load.
+    const audioEls = {};
+    SOUND_PROFILES.forEach((s) => {
+      const el = new Audio(s.file);
+      el.loop = true;
+      el.preload = "none";
+      el.volume = 0;
+      el.addEventListener("error", () => {
+        showError(`音效加载失败 Failed to load sound: ${s.file}`);
+      });
+      audioEls[s.id] = el;
+    });
+
     let currentSound = null;
     let isPlaying = false;
     let targetVolume = 0.65;
@@ -1945,454 +1985,22 @@
     let countdownInterval = null;
     let onStateChange = () => {};
 
-    function ensureCtx() {
-      const c = SharedAudio.ensureCtx();
-      // masterGain must live on whatever the current shared context is —
-      // recreate it if this is the first call, or if the shared context
-      // was replaced underneath us (e.g. recovered from being closed).
-      if (!masterGain || masterGain.context !== c) {
-        masterGain = c.createGain();
-        masterGain.gain.value = 0;
-        masterGain.connect(c.destination);
-      }
-      return c;
-    }
-
-    function noiseBuffer(context, seconds) {
-      const len = Math.floor(context.sampleRate * seconds);
-      const buffer = context.createBuffer(1, len, context.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-      return buffer;
-    }
-
-    function track(node) { activeNodes.push(node); return node; }
-
-    function clearNodes() {
-      activeNodes.forEach((n) => {
-        try { n.stop && n.stop(); } catch { /* already stopped */ }
-        try { n.disconnect && n.disconnect(); } catch { /* noop */ }
-      });
-      activeNodes = [];
-      scheduledIntervals.forEach((t) => clearInterval(t));
-      scheduledIntervals = [];
-    }
-
-    function buildRiver(c, out) {
-      // Two overlapping filtered-noise beds at non-matching loop lengths
-      // (8s / 13s), tuned into the "babbling brook" band (900-2200Hz)
-      // rather than the deep broadband rumble a waterfall would need —
-      // this is what keeps it reading as a small stream, not rapids.
-      const bedA = track(c.createBufferSource());
-      bedA.buffer = noiseBuffer(c, 8);
-      bedA.loop = true;
-      const bedAFilter = track(c.createBiquadFilter());
-      bedAFilter.type = "bandpass";
-      bedAFilter.frequency.value = 1100;
-      bedAFilter.Q.value = 0.7;
-      const bedAGain = track(c.createGain());
-      bedAGain.gain.value = 0.22;
-      bedA.connect(bedAFilter); bedAFilter.connect(bedAGain); bedAGain.connect(out);
-
-      const bedB = track(c.createBufferSource());
-      bedB.buffer = noiseBuffer(c, 13);
-      bedB.loop = true;
-      const bedBFilter = track(c.createBiquadFilter());
-      bedBFilter.type = "bandpass";
-      bedBFilter.frequency.value = 1900;
-      bedBFilter.Q.value = 0.6;
-      const bedBGain = track(c.createGain());
-      bedBGain.gain.value = 0.14;
-      bedB.connect(bedBFilter); bedBFilter.connect(bedBGain); bedBGain.connect(out);
-
-      bedA.start(); bedB.start();
-
-      // Slowly wander bedA's filter center frequency, like water shifting
-      // which stones it's running over — a moving filter reads as "flow",
-      // a fixed one reads as a static hiss.
-      const wander = () => {
-        if (!isPlaying || currentSound !== "river") return;
-        const now = c.currentTime;
-        const dur = 5 + Math.random() * 7;
-        bedAFilter.frequency.cancelScheduledValues(now);
-        bedAFilter.frequency.setValueAtTime(bedAFilter.frequency.value, now);
-        bedAFilter.frequency.linearRampToValueAtTime(800 + Math.random() * 700, now + dur);
-        scheduledIntervals.push(setTimeout(wander, dur * 1000));
+    // Ramps `el.volume` linearly to `target` over `seconds`, via rAF since
+    // HTMLMediaElement.volume has no built-in automation the way a Web
+    // Audio AudioParam does. Cancels any ramp already in flight on the same
+    // element so overlapping calls (e.g. rapid Play/Pause) don't fight.
+    function rampVolume(el, target, seconds) {
+      if (el.__rampFrame) cancelAnimationFrame(el.__rampFrame);
+      const start = el.volume;
+      const startTime = performance.now();
+      const durationMs = Math.max(50, seconds * 1000);
+      const step = (now) => {
+        const t = Math.min(1, (now - startTime) / durationMs);
+        el.volume = start + (target - start) * t;
+        if (t < 1) el.__rampFrame = requestAnimationFrame(step);
+        else el.__rampFrame = null;
       };
-      // Deferred, not called directly: Ambient.play() sets isPlaying = true
-      // only *after* build() returns, and these self-rescheduling
-      // generators bail out immediately if isPlaying isn't true yet — a
-      // direct synchronous call here would run before that flag flips and
-      // silently never reschedule itself again. setTimeout(fn, 0) defers
-      // to right after play() finishes, once isPlaying is actually true.
-      scheduledIntervals.push(setTimeout(wander, 0));
-
-      // Overall breathing: organic random-drift levels, same approach used
-      // by the other ambient beds — `intensity` also drives the bubble and
-      // rain-drop rates below, so the whole texture surges and eases
-      // together.
-      let intensity = 0.85;
-      const breathe = () => {
-        if (!isPlaying || currentSound !== "river") return;
-        intensity = 0.6 + Math.random() * 0.5;
-        const now = c.currentTime;
-        const dur = 5 + Math.random() * 6;
-        bedAGain.gain.cancelScheduledValues(now);
-        bedAGain.gain.setValueAtTime(bedAGain.gain.value, now);
-        bedAGain.gain.linearRampToValueAtTime(0.22 * intensity, now + dur);
-        bedBGain.gain.cancelScheduledValues(now);
-        bedBGain.gain.setValueAtTime(bedBGain.gain.value, now);
-        bedBGain.gain.linearRampToValueAtTime(0.14 * intensity, now + dur);
-        scheduledIntervals.push(setTimeout(breathe, dur * 1000));
-      };
-      scheduledIntervals.push(setTimeout(breathe, 0));
-
-      // Bubbling "plinks" — short resonant blips as the water trips over
-      // stones, at randomized pitch and irregular spacing.
-      const bubble = () => {
-        if (!isPlaying || currentSound !== "river") return;
-        const src = c.createBufferSource();
-        src.buffer = noiseBuffer(c, 0.06);
-        const filter = c.createBiquadFilter();
-        filter.type = "bandpass";
-        filter.frequency.value = 1400 + Math.random() * 2200;
-        filter.Q.value = 4 + Math.random() * 6;
-        const gain = c.createGain();
-        gain.gain.value = 0;
-        src.connect(filter); filter.connect(gain); gain.connect(out);
-        const now = c.currentTime;
-        const peak = (0.02 + Math.random() * 0.035) * intensity;
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(peak, now + 0.008);
-        gain.gain.exponentialRampToValueAtTime(0.0004, now + 0.05 + Math.random() * 0.06);
-        src.start(now);
-        src.stop(now + 0.15);
-
-        scheduledIntervals.push(setTimeout(bubble, (60 + Math.random() * 180) / intensity));
-      };
-      scheduledIntervals.push(setTimeout(bubble, 0));
-
-      // A light rain layer over the stream, per the reference mix — kept
-      // sparse and quiet, never louder than the water itself.
-      const drop = () => {
-        if (!isPlaying || currentSound !== "river") return;
-        const src = c.createBufferSource();
-        src.buffer = noiseBuffer(c, 0.05);
-        const filter = c.createBiquadFilter();
-        filter.type = "bandpass";
-        filter.frequency.value = 3000 + Math.random() * 3500;
-        filter.Q.value = 3 + Math.random() * 3;
-        const gain = c.createGain();
-        gain.gain.value = 0;
-        src.connect(filter); filter.connect(gain); gain.connect(out);
-        const now = c.currentTime;
-        const peak = (0.012 + Math.random() * 0.02) * intensity;
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(peak, now + 0.004);
-        gain.gain.exponentialRampToValueAtTime(0.0004, now + 0.04 + Math.random() * 0.03);
-        src.start(now);
-        src.stop(now + 0.09);
-
-        scheduledIntervals.push(setTimeout(drop, (200 + Math.random() * 500) / intensity));
-      };
-      scheduledIntervals.push(setTimeout(drop, 0));
-
-      out.gain.value = 1;
-    }
-
-    function buildJapaneseGarden(c, out) {
-      // Quiet flowing-water bed underneath everything else — subtler than
-      // the river sound above since here it's one layer among several, not
-      // the main event.
-      const streamSrc = track(c.createBufferSource());
-      streamSrc.buffer = noiseBuffer(c, 10);
-      streamSrc.loop = true;
-      const streamFilter = track(c.createBiquadFilter());
-      streamFilter.type = "bandpass";
-      streamFilter.frequency.value = 1300;
-      streamFilter.Q.value = 0.6;
-      const streamGain = track(c.createGain());
-      streamGain.gain.value = 0.1;
-      streamSrc.connect(streamFilter); streamFilter.connect(streamGain); streamGain.connect(out);
-      streamSrc.start();
-
-      const streamDrift = () => {
-        if (!isPlaying || currentSound !== "garden") return;
-        const now = c.currentTime;
-        const dur = 6 + Math.random() * 8;
-        streamGain.gain.cancelScheduledValues(now);
-        streamGain.gain.setValueAtTime(streamGain.gain.value, now);
-        streamGain.gain.linearRampToValueAtTime(0.06 + Math.random() * 0.07, now + dur);
-        scheduledIntervals.push(setTimeout(streamDrift, dur * 1000));
-      };
-      // Deferred — see the comment in buildRiver's wander() above: play()
-      // sets isPlaying = true only after build() returns.
-      scheduledIntervals.push(setTimeout(streamDrift, 0));
-
-      // Shishi-odoshi (鹿威し) bamboo fountain: a long, irregular fill-and-
-      // tip cycle ending in a single low woody "thonk" — a short noise
-      // transient plus a fast-decaying low sine, fired at random long
-      // intervals rather than a repeating loop.
-      const bambooKnock = () => {
-        if (!isPlaying || currentSound !== "garden") return;
-        const now = c.currentTime;
-        const clickSrc = c.createBufferSource();
-        clickSrc.buffer = noiseBuffer(c, 0.05);
-        const clickFilter = c.createBiquadFilter();
-        clickFilter.type = "bandpass";
-        clickFilter.frequency.value = 900;
-        clickFilter.Q.value = 2;
-        const clickGain = c.createGain();
-        clickGain.gain.setValueAtTime(0.16, now);
-        clickGain.gain.exponentialRampToValueAtTime(0.0005, now + 0.06);
-        clickSrc.connect(clickFilter); clickFilter.connect(clickGain); clickGain.connect(out);
-        clickSrc.start(now); clickSrc.stop(now + 0.08);
-
-        const thonk = c.createOscillator();
-        thonk.type = "sine";
-        thonk.frequency.setValueAtTime(210, now);
-        thonk.frequency.exponentialRampToValueAtTime(140, now + 0.25);
-        const thonkGain = c.createGain();
-        thonkGain.gain.setValueAtTime(0.22, now);
-        thonkGain.gain.exponentialRampToValueAtTime(0.0005, now + 0.7);
-        thonk.connect(thonkGain); thonkGain.connect(out);
-        thonk.start(now); thonk.stop(now + 0.8);
-
-        scheduledIntervals.push(setTimeout(bambooKnock, 14000 + Math.random() * 26000));
-      };
-      scheduledIntervals.push(setTimeout(bambooKnock, 6000 + Math.random() * 10000));
-
-      // Wind chimes (風鈴): a small pentatonic-ish set of bell tones. Wind
-      // gusts arrive as short clusters of 1-4 chimes rather than isolated
-      // notes, at a random pitch each time, then go quiet for a while.
-      const chimeScale = [880, 990, 1175, 1320, 1568, 1760];
-      const chime = (when) => {
-        if (!isPlaying || currentSound !== "garden") return;
-        const now = when;
-        const freq = chimeScale[Math.floor(Math.random() * chimeScale.length)];
-        const osc = c.createOscillator();
-        osc.type = "sine";
-        osc.frequency.value = freq;
-        const overtone = c.createOscillator();
-        overtone.type = "sine";
-        overtone.frequency.value = freq * 2.4;
-        const overtoneGain = c.createGain();
-        overtoneGain.gain.value = 0.15;
-        overtone.connect(overtoneGain);
-        const gain = c.createGain();
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.05 + Math.random() * 0.05, now + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.0004, now + 2.5 + Math.random() * 1.5);
-        osc.connect(gain); overtoneGain.connect(gain); gain.connect(out);
-        osc.start(now); overtone.start(now);
-        osc.stop(now + 4.2); overtone.stop(now + 4.2);
-      };
-      const chimeGust = () => {
-        if (!isPlaying || currentSound !== "garden") return;
-        const strikes = 1 + Math.floor(Math.random() * 4);
-        const now = c.currentTime;
-        for (let i = 0; i < strikes; i++) {
-          chime(now + i * (0.25 + Math.random() * 0.4));
-        }
-        scheduledIntervals.push(setTimeout(chimeGust, 10000 + Math.random() * 25000));
-      };
-      scheduledIntervals.push(setTimeout(chimeGust, 5000 + Math.random() * 8000));
-
-      // Occasional bird calls: a couple of short pitch-swept chirps, kept
-      // very sparse so the garden reads as quiet, not busy.
-      const bird = () => {
-        if (!isPlaying || currentSound !== "garden") return;
-        const now = c.currentTime;
-        const chirps = 1 + Math.floor(Math.random() * 3);
-        for (let i = 0; i < chirps; i++) {
-          const start = now + i * (0.12 + Math.random() * 0.1);
-          const osc = c.createOscillator();
-          osc.type = "sine";
-          const base = 2600 + Math.random() * 1400;
-          osc.frequency.setValueAtTime(base, start);
-          osc.frequency.exponentialRampToValueAtTime(base * (1.3 + Math.random() * 0.4), start + 0.05);
-          osc.frequency.exponentialRampToValueAtTime(base * 0.8, start + 0.11);
-          const gain = c.createGain();
-          gain.gain.setValueAtTime(0, start);
-          gain.gain.linearRampToValueAtTime(0.05 + Math.random() * 0.03, start + 0.01);
-          gain.gain.exponentialRampToValueAtTime(0.0004, start + 0.13);
-          osc.connect(gain); gain.connect(out);
-          osc.start(start); osc.stop(start + 0.15);
-        }
-        scheduledIntervals.push(setTimeout(bird, 18000 + Math.random() * 40000));
-      };
-      scheduledIntervals.push(setTimeout(bird, 9000 + Math.random() * 15000));
-
-      out.gain.value = 1;
-    }
-
-    function buildCatPurr(c, out) {
-      // A cat's purr comes from laryngeal muscle twitching at roughly
-      // 25-50Hz during both inhale and exhale. A sawtooth (not sine)
-      // carrier gives it the buzzy harmonic content a purr actually has,
-      // low-passed so it stays a felt rumble rather than an audible tone.
-      const carrier = track(c.createOscillator());
-      carrier.type = "sawtooth";
-      carrier.frequency.value = 32;
-      const carrierLp = track(c.createBiquadFilter());
-      carrierLp.type = "lowpass";
-      carrierLp.frequency.value = 220;
-      carrier.connect(carrierLp);
-
-      // Slowly wander the fundamental within the 25-50Hz purr range so the
-      // pitch never sits perfectly still.
-      const pitchWander = () => {
-        if (!isPlaying || currentSound !== "purr") return;
-        const now = c.currentTime;
-        const dur = 6 + Math.random() * 8;
-        carrier.frequency.cancelScheduledValues(now);
-        carrier.frequency.setValueAtTime(carrier.frequency.value, now);
-        carrier.frequency.linearRampToValueAtTime(25 + Math.random() * 25, now + dur);
-        scheduledIntervals.push(setTimeout(pitchWander, dur * 1000));
-      };
-      // Deferred — see the comment in buildRiver's wander() above.
-      scheduledIntervals.push(setTimeout(pitchWander, 0));
-
-      // The "chugging" texture: an AM tremolo roughly double the purr rate
-      // (one pulse per inhale, one per exhale each cycle) is what actually
-      // makes this read as a purr instead of a plain low tone.
-      const chugGain = track(c.createGain());
-      chugGain.gain.value = 0.5;
-      const chugLfo = track(c.createOscillator());
-      chugLfo.type = "sine";
-      chugLfo.frequency.value = 58;
-      const chugDepth = track(c.createGain());
-      chugDepth.gain.value = 0.5;
-      chugLfo.connect(chugDepth); chugDepth.connect(chugGain.gain);
-      carrierLp.connect(chugGain);
-
-      // Filtered noise "grain" adds the rasp of real vocal-fold contact
-      // instead of a clean electronic buzz, run through the same tremolo.
-      const grain = track(c.createBufferSource());
-      grain.buffer = noiseBuffer(c, 6);
-      grain.loop = true;
-      const grainLp = track(c.createBiquadFilter());
-      grainLp.type = "lowpass";
-      grainLp.frequency.value = 140;
-      const grainGain = track(c.createGain());
-      grainGain.gain.value = 0.15;
-      grain.connect(grainLp); grainLp.connect(grainGain); grainGain.connect(chugGain);
-
-      // Overall breathing envelope — a slow, irregular inhale/exhale swell
-      // layered on top of the fast chugging, so the purr rises and falls
-      // in intensity instead of sitting at one flat level.
-      const breatheGain = track(c.createGain());
-      breatheGain.gain.value = 0.5;
-      chugGain.connect(breatheGain); breatheGain.connect(out);
-
-      const breathe = () => {
-        if (!isPlaying || currentSound !== "purr") return;
-        const now = c.currentTime;
-        const dur = 3 + Math.random() * 3.5;
-        breatheGain.gain.cancelScheduledValues(now);
-        breatheGain.gain.setValueAtTime(breatheGain.gain.value, now);
-        breatheGain.gain.linearRampToValueAtTime(0.35 + Math.random() * 0.35, now + dur);
-        scheduledIntervals.push(setTimeout(breathe, dur * 1000));
-      };
-      scheduledIntervals.push(setTimeout(breathe, 0));
-
-      carrier.start(); chugLfo.start(); grain.start();
-
-      out.gain.value = 1;
-    }
-
-    function buildSingingBowl(c, out) {
-      // Three sine "bowl" tones (528 / 396 / 639 Hz) that each breathe in
-      // and out on their own slow cycle — different swell rates so the
-      // three never quite sync, plus a gentle pitch vibrato — and a low
-      // 136Hz "Om" drone underneath as a steady, warm foundation.
-      const bowlTones = [
-        { freq: 528, swellRate: 0.045, peak: 0.17 },
-        { freq: 396, swellRate: 0.035, peak: 0.14 },
-        { freq: 639, swellRate: 0.052, peak: 0.12 },
-      ];
-
-      bowlTones.forEach(({ freq, swellRate, peak }) => {
-        const osc = track(c.createOscillator());
-        osc.type = "sine";
-        osc.frequency.value = freq;
-
-        // Gentle vibrato — a couple of Hz of slow pitch wobble, not a wide
-        // warble, so it reads as a hand-struck bowl rather than a synth.
-        const vibrato = track(c.createOscillator());
-        vibrato.type = "sine";
-        vibrato.frequency.value = 0.15 + Math.random() * 0.1;
-        const vibratoGain = track(c.createGain());
-        vibratoGain.gain.value = 1.5 + Math.random();
-        vibrato.connect(vibratoGain); vibratoGain.connect(osc.frequency);
-
-        // Slow fade-in/fade-out: a sine LFO modulating this tone's own gain
-        // between silence and its peak, on its own unhurried cycle.
-        const toneGain = track(c.createGain());
-        const base = peak / 2;
-        toneGain.gain.value = base;
-        osc.connect(toneGain); toneGain.connect(out);
-
-        const swellLfo = track(c.createOscillator());
-        swellLfo.type = "sine";
-        swellLfo.frequency.value = swellRate;
-        const swellDepth = track(c.createGain());
-        swellDepth.gain.value = base;
-        swellLfo.connect(swellDepth); swellDepth.connect(toneGain.gain);
-
-        osc.start(); vibrato.start(); swellLfo.start();
-      });
-
-      // Low 136Hz Om drone underneath, with a whisper of its octave for
-      // warmth and a very slow, shallow swell — steady enough to read as
-      // a foundation rather than another moving layer.
-      const drone = track(c.createOscillator());
-      drone.type = "sine";
-      drone.frequency.value = 136;
-      const droneOvertone = track(c.createOscillator());
-      droneOvertone.type = "sine";
-      droneOvertone.frequency.value = 136 * 2;
-      const droneOvertoneGain = track(c.createGain());
-      droneOvertoneGain.gain.value = 0.06;
-      droneOvertone.connect(droneOvertoneGain);
-
-      const droneGain = track(c.createGain());
-      const droneBase = 0.24;
-      droneGain.gain.value = droneBase;
-      drone.connect(droneGain);
-      droneOvertoneGain.connect(droneGain);
-      droneGain.connect(out);
-
-      const droneSwellLfo = track(c.createOscillator());
-      droneSwellLfo.type = "sine";
-      droneSwellLfo.frequency.value = 0.025;
-      const droneSwellDepth = track(c.createGain());
-      droneSwellDepth.gain.value = droneBase * 0.3;
-      droneSwellLfo.connect(droneSwellDepth); droneSwellDepth.connect(droneGain.gain);
-
-      drone.start(); droneOvertone.start(); droneSwellLfo.start();
-
-      out.gain.value = 1;
-    }
-
-    const BUILDERS = { river: buildRiver, bowl: buildSingingBowl, garden: buildJapaneseGarden, purr: buildCatPurr };
-
-    function build(type) {
-      const c = ensureCtx();
-      clearNodes();
-      const out = track(c.createGain());
-      out.gain.value = 1;
-      out.connect(masterGain);
-      (BUILDERS[type] || buildRiver)(c, out);
-      currentSound = type;
-    }
-
-    function fadeMasterTo(value, seconds) {
-      const c = ensureCtx();
-      const now = c.currentTime;
-      masterGain.gain.cancelScheduledValues(now);
-      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
-      masterGain.gain.linearRampToValueAtTime(value, Math.max(now + 0.05, now + seconds));
+      el.__rampFrame = requestAnimationFrame(step);
     }
 
     function clearCountdown() {
@@ -2405,27 +2013,46 @@
       countdownInterval = setInterval(() => {
         const remainingMs = timerEndsAt - Date.now();
         if (remainingMs <= 0) { stop(); return; }
-        if (remainingMs <= 8000 && isPlaying) fadeMasterTo(0, remainingMs / 1000);
+        if (remainingMs <= 8000 && isPlaying) {
+          const el = audioEls[currentSound];
+          if (el) rampVolume(el, 0, remainingMs / 1000);
+        }
         onStateChange();
       }, 1000);
       onStateChange();
     }
 
     function play(type) {
-      try {
-        if (type) build(type);
-        else if (!currentSound) build(SOUND_PROFILES[0].id);
-      } catch (err) {
-        // Surface it — a silent catch here is exactly how "I clicked Play
-        // and nothing happened" bugs go undiagnosed.
-        showError(`播放失败 Playback failed: ${err && err.message ? err.message : err}`);
+      const nextType = type || currentSound || SOUND_PROFILES[0].id;
+      const nextEl = audioEls[nextType];
+      if (!nextEl) {
+        showError(`未知音效 Unknown sound: ${nextType}`);
         return;
       }
+
+      if (currentSound && currentSound !== nextType) {
+        const prevEl = audioEls[currentSound];
+        if (prevEl && !prevEl.paused) { prevEl.pause(); prevEl.currentTime = 0; }
+      }
+      currentSound = nextType;
+
+      nextEl.currentTime = 0;
+      nextEl.volume = 0;
+      // .play() must be called synchronously from the click handler that
+      // triggered it — that's what makes it count as a user gesture to the
+      // browser's autoplay policy. Everything after (the .catch chain) can
+      // resolve later.
+      const playPromise = nextEl.play();
+      if (playPromise && playPromise.catch) {
+        playPromise.catch((err) => {
+          showError(`播放失败 Playback failed: ${err && err.message ? err.message : err}`);
+        });
+      }
       isPlaying = true;
-      // A short, snappy fade-in (was 2.5s) — long enough to avoid a click/
-      // pop, short enough that pressing Play gives audible confirmation
-      // almost immediately instead of "did anything happen?".
-      fadeMasterTo(targetVolume, 0.5);
+      // A short, snappy fade-in — long enough to avoid a click/pop, short
+      // enough that pressing Play gives audible confirmation almost
+      // immediately instead of "did anything happen?".
+      rampVolume(nextEl, targetVolume, 0.5);
       if (timerMinutes > 0) {
         timerEndsAt = Date.now() + timerMinutes * 60000;
         startCountdown();
@@ -2437,11 +2064,14 @@
     }
 
     function stop() {
-      fadeMasterTo(0, 1.2);
+      const el = audioEls[currentSound];
+      if (el) {
+        rampVolume(el, 0, 1.2);
+        setTimeout(() => { if (!isPlaying) { el.pause(); el.currentTime = 0; } }, 1300);
+      }
       isPlaying = false;
       clearCountdown();
       timerEndsAt = null;
-      setTimeout(() => { if (!isPlaying) clearNodes(); }, 1300);
       onStateChange();
     }
 
@@ -2449,7 +2079,8 @@
 
     function select(type) {
       if (isPlaying) {
-        fadeMasterTo(0, 0.4);
+        const prevEl = audioEls[currentSound];
+        if (prevEl) rampVolume(prevEl, 0, 0.4);
         setTimeout(() => play(type), 420);
       } else {
         currentSound = type;
@@ -2459,7 +2090,10 @@
 
     function setVolume(v) {
       targetVolume = v;
-      if (isPlaying) fadeMasterTo(v, 0.3);
+      if (isPlaying) {
+        const el = audioEls[currentSound];
+        if (el) rampVolume(el, v, 0.3);
+      }
     }
 
     function setTimer(minutes) {
@@ -2492,11 +2126,12 @@
 
   // ---------------------------------------------------------------------
   // Singing bowl — single strike. Distinct from the continuous "颂钵"
-  // ambient loop above: this hits the bowl once (sharp attack, long slow
-  // decay) rather than looping, on its own dedicated AudioContext so it's
-  // independent of Ambient's play/pause/volume/timer state. Strikes are
-  // allowed to overlap — hitting it again while a previous strike is
-  // still ringing layers naturally, the same way a real bowl does.
+  // ambient sound above (now an mp3 file, see Ambient/SOUND_PROFILES): this
+  // hits the bowl once (sharp attack, long slow decay) via a synthesized
+  // Web Audio API sound rather than looping an audio file, independent of
+  // Ambient's play/pause/volume/timer state. Strikes are allowed to
+  // overlap — hitting it again while a previous strike is still ringing
+  // layers naturally, the same way a real bowl does.
   // ---------------------------------------------------------------------
 
   const SingingBowlStrike = (() => {
@@ -2617,16 +2252,6 @@
   }
 
   Ambient.onChange(updateAmbientUI);
-
-  // Safari (desktop and iOS) has been unreliable at actually producing
-  // audible Web Audio API output for this app even when AudioContext
-  // reports state "running" with no errors — Chrome does not have this
-  // problem. Flag it for Safari users instead of chasing it further.
-  (function warnIfSafari() {
-    const ua = navigator.userAgent;
-    const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(ua);
-    if (isSafari) $("ambientBrowserHint").style.display = "block";
-  })();
 
   $("ambientToggle").addEventListener("click", () => {
     const panel = $("ambientPanel");
