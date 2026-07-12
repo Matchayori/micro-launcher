@@ -595,12 +595,33 @@
   /* "I did it" completion */
   .completion-row { display: none; margin: 2px 0 18px; text-align: center; }
   .completion-row.visible { display: block; }
+  .completion-buttons {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
   .completion-message {
     margin-top: 10px;
     color: var(--accent);
     font-size: 0.9rem;
     font-weight: 500;
   }
+  .later-picker { display: none; margin-top: 12px; }
+  .later-picker.visible { display: block; }
+  .later-picker .presets { justify-content: center; }
+
+  .notice-box {
+    display: none;
+    margin-top: 16px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 0.88rem;
+    text-align: center;
+  }
+  .notice-box.visible { display: block; }
 
   .reply-row {
     display: flex;
@@ -832,6 +853,8 @@
   <!-- Main card — the first thing you interact with: one box, one button -->
   <div class="card">
 
+    <div class="notice-box" id="noticeBox"></div>
+
     <!-- Starter form: shown before a conversation begins -->
     <div id="starterForm">
       <div id="taskStep">
@@ -886,7 +909,14 @@
       <div class="chat-thread" id="chatThread"></div>
 
       <div class="completion-row" id="completionRow">
-        <button class="primary" id="completedBtn" type="button">我做到了 ✓ I did it</button>
+        <div class="completion-buttons">
+          <button class="primary" id="completedBtn" type="button">我做到了 ✓ I did it</button>
+          <button class="secondary" id="laterBtn" type="button">⏰ 等一下再做 I'll do it later</button>
+        </div>
+        <div class="later-picker" id="laterPicker">
+          <div class="hint">提醒我，过：/ Remind me in:</div>
+          <div class="presets" id="laterOptions"></div>
+        </div>
         <div class="completion-message" id="completionMessage"></div>
       </div>
 
@@ -1028,6 +1058,7 @@
     completions: "microLauncher_completions",
     history: "microLauncher_history",
     dynamicBg: "microLauncher_dynamicBg",
+    reminders: "microLauncher_reminders",
   };
 
   const MODEL = "claude-sonnet-4-6";
@@ -1112,6 +1143,14 @@
     { id: 15, label: "15 分钟 15 min" },
     { id: 25, label: "25 分钟 Pomodoro" },
     { id: 0, label: "∞ 不限时 No limit" },
+  ];
+
+  // "⏰ 等一下再做" delay options — how long from now to remind the user.
+  const LATER_OPTIONS = [
+    { minutes: 15, zh: "15 分钟后", en: "15 min" },
+    { minutes: 30, zh: "30 分钟后", en: "30 min" },
+    { minutes: 60, zh: "1 小时后", en: "1 hour" },
+    { minutes: 120, zh: "2 小时后", en: "2 hours" },
   ];
 
   const MIC_LANG_OPTIONS = [
@@ -2852,6 +2891,7 @@
     $("completedBtn").disabled = false;
     $("completedBtn").textContent = "我做到了 ✓ I did it";
     $("completionMessage").textContent = "";
+    $("laterPicker").classList.remove("visible");
   }
 
   // ---------------------------------------------------------------------
@@ -3097,6 +3137,148 @@
     if (currentSessionId && conversation.length > 0) saveCurrentSession(currentSessionCompleted);
   });
 
+  // ---------------------------------------------------------------------
+  // "⏰ 等一下再做" reminders — defer the current conversation, collapse
+  // back to the home screen, and get a browser Notification when it's time
+  // to pick it back up. This is a static, backend-less app: there's no push
+  // server, so the reminder only actually fires while this tab/browser is
+  // still running (a background tab is fine; a fully closed browser is
+  // not). If the browser was closed right through the target time, the
+  // reminder fires as soon as this page is loaded again instead of being
+  // silently lost.
+  // ---------------------------------------------------------------------
+
+  const scheduledReminderTimeouts = {}; // reminder id -> timeout id, so we don't double-schedule
+
+  function loadReminders() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEYS.reminders));
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveReminders(list) {
+    localStorage.setItem(STORAGE_KEYS.reminders, JSON.stringify(list));
+  }
+
+  function removeReminder(id) {
+    saveReminders(loadReminders().filter((r) => r.id !== id));
+  }
+
+  function requestNotificationPermission() {
+    if (typeof Notification === "undefined") return Promise.resolve("unsupported");
+    if (Notification.permission === "granted" || Notification.permission === "denied") {
+      return Promise.resolve(Notification.permission);
+    }
+    // Modern browsers return a Promise; a couple of older ones only
+    // support the callback form — resolve on whichever one fires.
+    return new Promise((resolve) => {
+      try {
+        const maybePromise = Notification.requestPermission((p) => resolve(p));
+        if (maybePromise && typeof maybePromise.then === "function") {
+          maybePromise.then(resolve).catch(() => resolve("denied"));
+        }
+      } catch {
+        resolve("denied");
+      }
+    });
+  }
+
+  function resumeSession(record) {
+    conversation = record.messages.map((m) => ({ role: m.role, content: m.content }));
+    currentSessionId = record.id;
+    currentSessionMeta = { task: record.task, quadrant: record.quadrant, startedAt: record.startedAt };
+    currentSessionCompleted = !!record.completed;
+
+    closeHistoryDrawer();
+    $("taskStep").style.display = "none";
+    $("quadrantStep").style.display = "none";
+    $("starterForm").style.display = "none";
+    $("chatArea").classList.add("open");
+    $("chatThread").innerHTML = "";
+    resetCompletionUI();
+    $("emailInlineBox").classList.remove("visible");
+    $("emailInlineInput").value = "";
+    hideNotice();
+
+    conversation.forEach((m) => {
+      if (m.role === "user") addUserBubble(m.content);
+      else addAssistantBubble(m.content, looksLikeActionText(m.content));
+    });
+  }
+
+  function fireReminder(reminder) {
+    removeReminder(reminder.id);
+    delete scheduledReminderTimeouts[reminder.id];
+
+    const record = loadHistory().find((h) => h.id === reminder.id);
+    if (!record) return; // deleted from history in the meantime — nothing to remind about
+
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const summary = record.task.length > 80 ? `${record.task.slice(0, 77)}…` : record.task;
+    try {
+      const notification = new Notification("现在可以开始了吗？Ready to start?", {
+        body: `你之前说要做的事：${summary}，现在可以开始了吗？\nThe thing you said you'd do: ${summary} — ready now?`,
+        tag: reminder.id,
+      });
+      notification.onclick = () => {
+        window.focus();
+        resumeSession(record);
+        notification.close();
+      };
+    } catch {
+      // A handful of mobile browsers throw synchronously from `new
+      // Notification()` instead of just not supporting it — this is a
+      // nice-to-have reminder, never let it crash the app.
+    }
+  }
+
+  function scheduleReminder(reminder) {
+    if (scheduledReminderTimeouts[reminder.id]) return;
+    const delay = reminder.fireAt - Date.now();
+    if (delay <= 0) { fireReminder(reminder); return; }
+    scheduledReminderTimeouts[reminder.id] = setTimeout(() => fireReminder(reminder), delay);
+  }
+
+  function scheduleAllPendingReminders() {
+    loadReminders().forEach(scheduleReminder);
+  }
+
+  function showNotice(msg) {
+    const box = $("noticeBox");
+    box.innerHTML = msg;
+    box.classList.add("visible");
+  }
+
+  function hideNotice() {
+    $("noticeBox").classList.remove("visible");
+  }
+
+  async function scheduleLater(minutes) {
+    if (!currentSessionId || conversation.length === 0) return;
+
+    const fireAt = Date.now() + minutes * 60000;
+    saveCurrentSession(currentSessionCompleted); // history record to resume from later
+    const reminder = { id: currentSessionId, task: currentSessionMeta.task, fireAt };
+    saveReminders([...loadReminders(), reminder]);
+    scheduleReminder(reminder);
+
+    const permission = await requestNotificationPermission();
+
+    resetToHome();
+
+    const option = LATER_OPTIONS.find((o) => o.minutes === minutes) || { zh: `${minutes} 分钟后`, en: `${minutes} min` };
+    if (permission === "granted") {
+      showNotice(`⏰ 已设置提醒，${option.zh}会提醒你继续。<br>Reminder set — you'll hear from us in ${option.en}.`);
+    } else {
+      showNotice(`⏰ 已记录，但通知权限未开启，到时不会弹提醒——可以在浏览器设置里允许通知。<br>Reminder saved, but notifications aren't enabled — allow them in your browser settings to actually get the popup.`);
+    }
+  }
+
+  scheduleAllPendingReminders();
+
   // Step 1: capture the task, then show the Eisenhower quadrant picker
   // instead of sending straight to the AI.
   function showQuadrantStep() {
@@ -3132,6 +3314,7 @@
     resetCompletionUI();
     $("emailInlineBox").classList.remove("visible");
     $("emailInlineInput").value = "";
+    hideNotice();
 
     let displayText = task;
     if (quadrant) displayText += `\n\n${quadrant.emoji} ${quadrant.zh} / ${quadrant.en}`;
@@ -3203,8 +3386,23 @@
     try { launchConfetti(); } catch { /* decorative — never block completion on this */ }
   });
 
-  $("startOverBtn").addEventListener("click", () => {
-    if (currentSessionId) saveCurrentSession(currentSessionCompleted);
+  (function renderLaterOptions() {
+    const wrap = $("laterOptions");
+    LATER_OPTIONS.forEach((o) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip";
+      chip.textContent = `${o.zh} ${o.en}`;
+      chip.addEventListener("click", () => scheduleLater(o.minutes));
+      wrap.appendChild(chip);
+    });
+  })();
+
+  $("laterBtn").addEventListener("click", () => {
+    $("laterPicker").classList.toggle("visible");
+  });
+
+  function resetToHome() {
     conversation = [];
     emailOffered = false;
     pendingTask = "";
@@ -3221,6 +3419,11 @@
     $("emailInlineBox").classList.remove("visible");
     resetCompletionUI();
     hideError();
+  }
+
+  $("startOverBtn").addEventListener("click", () => {
+    if (currentSessionId) saveCurrentSession(currentSessionCompleted);
+    resetToHome();
     $("taskInput").focus();
   });
 
