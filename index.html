@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>微启动器 Micro-Launcher</title>
+<title>微启动器</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -834,19 +834,19 @@
 
   <header>
     <div class="header-text">
-      <h1>微启动器 Micro-Launcher</h1>
-      <p>不一定是逃避，可能只是还没找到入口。<br>It's not always avoidance — sometimes you just need a way in.</p>
+      <h1>微启动器</h1>
+      <p>不一定是逃避，可能只是还没找到入口。</p>
       <div class="streak" id="streakCounter"></div>
     </div>
     <div class="header-actions">
-      <label class="bg-toggle" id="bgToggleWrap" title="动态背景 Dynamic background — 开启后渲染 WebGL 日落海面，更耗电 / Renders a WebGL sunset-sea background when on (uses more power)">
+      <label class="bg-toggle" id="bgToggleWrap" title="动态背景 — 开启后渲染 WebGL 日落海面，更耗电">
         <span aria-hidden="true">🌅</span>
         <input type="checkbox" id="dynamicBgToggle">
         <span class="bg-toggle-track"></span>
       </label>
-      <button class="icon-btn" id="historyToggle" title="历史记录 History">📋</button>
-      <button class="icon-btn" id="ambientToggle" title="环境音 Ambient sound">🎧</button>
-      <button class="icon-btn" id="settingsToggle" title="设置 Settings">⚙️</button>
+      <button class="icon-btn" id="historyToggle" title="历史记录">📋</button>
+      <button class="icon-btn" id="ambientToggle" title="环境音">🎧</button>
+      <button class="icon-btn" id="settingsToggle" title="设置">⚙️</button>
     </div>
   </header>
 
@@ -858,18 +858,18 @@
     <!-- Starter form: shown before a conversation begins -->
     <div id="starterForm">
       <div id="taskStep">
-        <label for="taskInput">今天卡在哪儿了？Where are you stuck today?</label>
-        <div class="hint">打字，或点击 🎤 开始/停止说话（也可按住空格键）。<br>Type, tap 🎤 to start/stop talking (or hold Space).</div>
+        <label for="taskInput">今天卡在哪儿了？</label>
+        <div class="hint">打字，或点击 🎤 开始/停止说话（也可按住空格键）。</div>
 
         <div class="input-with-mic">
           <textarea id="taskInput" placeholder="例如：我需要回复导师的邮件，但一想到打开邮箱就很抗拒…&#10;e.g. I need to reply to my advisor's email but I feel a wall of resistance just thinking about opening my inbox…" autofocus></textarea>
-          <button class="mic-btn" id="taskMicBtn" type="button" title="点击说话 Click to talk"><span class="mic-icon">🎤</span><span class="mic-recording-dot" aria-hidden="true"></span></button>
+          <button class="mic-btn" id="taskMicBtn" type="button" title="点击说话"><span class="mic-icon">🎤</span><span class="mic-recording-dot" aria-hidden="true"></span></button>
         </div>
         <div class="mic-meta" id="taskMicStatus"></div>
 
-        <button class="primary" id="submitBtn" type="button">说吧 Just say it</button>
+        <button class="primary" id="submitBtn" type="button">说吧</button>
 
-        <div class="templates-label">或者，从这里开始 / Or start from one of these</div>
+        <div class="templates-label">或者，从这里开始</div>
         <div class="templates" id="templateCards"></div>
       </div>
 
@@ -877,44 +877,44 @@
       <div id="quadrantStep" style="display:none;">
         <div class="quadrant-recap-row">
           <span class="quadrant-recap" id="quadrantRecap"></span>
-          <button type="button" class="quadrant-edit-link" id="quadrantEditBtn">✎ 改一下 Edit</button>
+          <button type="button" class="quadrant-edit-link" id="quadrantEditBtn">✎ 改一下</button>
         </div>
-        <div class="hint" style="text-align:center; margin-top:2px;">这件事大概是…… / This is roughly...</div>
+        <div class="hint" style="text-align:center; margin-top:2px;">这件事大概是……</div>
         <div class="quadrant-grid">
           <button type="button" class="quadrant-cell quadrant-urgent-important" data-quadrant="urgent-important">
             <span class="quadrant-emoji">🔴</span>
-            <span class="quadrant-label">重要且紧急<br>Important &amp; Urgent</span>
+            <span class="quadrant-label">重要且紧急</span>
           </button>
           <button type="button" class="quadrant-cell quadrant-important-not-urgent" data-quadrant="important-not-urgent">
             <span class="quadrant-emoji">🟡</span>
-            <span class="quadrant-label">重要不紧急<br>Important, Not Urgent</span>
+            <span class="quadrant-label">重要不紧急</span>
           </button>
           <button type="button" class="quadrant-cell quadrant-urgent-not-important" data-quadrant="urgent-not-important">
             <span class="quadrant-emoji">🟠</span>
-            <span class="quadrant-label">不重要但紧急<br>Urgent, Not Important</span>
+            <span class="quadrant-label">不重要但紧急</span>
           </button>
           <button type="button" class="quadrant-cell quadrant-neither" data-quadrant="neither">
             <span class="quadrant-emoji">🟢</span>
-            <span class="quadrant-label">不重要不紧急<br>Not Important/Urgent</span>
+            <span class="quadrant-label">不重要不紧急</span>
           </button>
         </div>
-        <div class="toggle-row" id="quadrantSkip" style="justify-content:center;">跳过，直接聊 / Skip, just talk</div>
+        <div class="toggle-row" id="quadrantSkip" style="justify-content:center;">跳过，直接聊</div>
       </div>
     </div>
 
     <!-- Chat area: shown once a conversation has started -->
     <div id="chatArea">
-      <div class="toggle-row" id="startOverBtn">↺ 重新开始 Start over</div>
+      <div class="toggle-row" id="startOverBtn">↺ 重新开始</div>
 
       <div class="chat-thread" id="chatThread"></div>
 
       <div class="completion-row" id="completionRow">
         <div class="completion-buttons">
-          <button class="primary" id="completedBtn" type="button">我做到了 ✓ I did it</button>
-          <button class="secondary" id="laterBtn" type="button">⏰ 等一下再做 I'll do it later</button>
+          <button class="primary" id="completedBtn" type="button">我做到了 ✓</button>
+          <button class="secondary" id="laterBtn" type="button">⏰ 等一下再做</button>
         </div>
         <div class="later-picker" id="laterPicker">
-          <div class="hint">提醒我，过：/ Remind me in:</div>
+          <div class="hint">提醒我，过：</div>
           <div class="presets" id="laterOptions"></div>
         </div>
         <div class="completion-message" id="completionMessage"></div>
@@ -922,16 +922,16 @@
 
       <!-- Only revealed once the AI's reply suggests this is about an email -->
       <div class="email-inline" id="emailInlineBox">
-        <label for="emailInlineInput">📧 需要的话，把邮件原文粘贴在这里 / Paste the email here if it helps</label>
-        <textarea id="emailInlineInput" placeholder="粘贴邮件原文… 发送下一条消息时会自动附上。/ Paste it — it'll be attached to your next message."></textarea>
+        <label for="emailInlineInput">📧 需要的话，把邮件原文粘贴在这里</label>
+        <textarea id="emailInlineInput" placeholder="粘贴邮件原文… 发送下一条消息时会自动附上。"></textarea>
       </div>
 
       <div class="reply-row">
         <div class="input-with-mic">
-          <textarea id="replyInput" rows="2" placeholder="继续说… / Keep going…"></textarea>
-          <button class="mic-btn" id="replyMicBtn" type="button" title="点击说话 Click to talk"><span class="mic-icon">🎤</span><span class="mic-recording-dot" aria-hidden="true"></span></button>
+          <textarea id="replyInput" rows="2" placeholder="继续说…"></textarea>
+          <button class="mic-btn" id="replyMicBtn" type="button" title="点击说话"><span class="mic-icon">🎤</span><span class="mic-recording-dot" aria-hidden="true"></span></button>
         </div>
-        <button class="icon-btn" id="replySendBtn" title="发送 Send" type="button">➤</button>
+        <button class="icon-btn" id="replySendBtn" title="发送" type="button">➤</button>
       </div>
       <div class="mic-meta" id="replyMicStatus"></div>
     </div>
@@ -941,17 +941,17 @@
 
   <!-- Quick launch (secondary — the AI also surfaces the relevant one inline) -->
   <div>
-    <div class="section-title">🚀 快速启动 Quick launch</div>
+    <div class="section-title">🚀 快速启动</div>
     <div class="launch-grid" id="launchGrid"></div>
   </div>
 
   <!-- Settings -->
   <div class="card" id="settingsPanel">
-    <h2>⚙️ 设置 Settings</h2>
+    <h2>⚙️ 设置</h2>
 
     <div class="field">
-      <label for="apiKeyInput">Anthropic API Key</label>
-      <div class="hint">仅保存在本机浏览器 localStorage 中，只会发送给 Anthropic API。<br>Stored only in your browser's localStorage — sent only to Anthropic's API.</div>
+      <label for="apiKeyInput">Anthropic API 密钥</label>
+      <div class="hint">仅保存在本机浏览器 localStorage 中，只会发送给 Anthropic API。</div>
       <div class="row-flex">
         <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
         <button class="secondary" id="toggleKeyVisibility" type="button">👁</button>
@@ -959,58 +959,58 @@
     </div>
 
     <div class="field">
-      <label>语音识别语言 Voice recognition language</label>
-      <div class="hint">点击 🎤 说话时使用的识别语言。<br>Language used when you tap 🎤 to talk.</div>
+      <label>语音识别语言</label>
+      <div class="hint">点击 🎤 说话时使用的识别语言。</div>
       <div class="presets" id="micLangOptions"></div>
     </div>
 
     <div class="field">
-      <label for="systemPrompt">系统提示词 System Prompt</label>
-      <div class="hint">可以随时修改、调优这段提示词。<br>Edit this anytime to refine how the app diagnoses and helps you.</div>
+      <label for="systemPrompt">系统提示词</label>
+      <div class="hint">可以随时修改、调优这段提示词。</div>
       <textarea id="systemPrompt" spellcheck="false"></textarea>
       <div class="settings-actions">
-        <button class="secondary" id="resetPromptBtn" type="button">恢复默认 Reset to default</button>
+        <button class="secondary" id="resetPromptBtn" type="button">恢复默认</button>
       </div>
     </div>
 
     <div class="field">
-      <label>快速启动链接 Quick-launch links</label>
-      <div class="hint">底部显示的快捷入口，也用于对话中「打开 Gmail/Outlook」按钮的匹配。<br>Shown at the bottom — also used to match the inline "Open Gmail/Outlook" button in chat.</div>
+      <label>快速启动链接</label>
+      <div class="hint">底部显示的快捷入口，也用于对话中「打开 Gmail/Outlook」按钮的匹配。</div>
       <div class="links-editor" id="linksEditor"></div>
       <div class="settings-actions">
-        <button class="secondary" id="addLinkBtn" type="button">+ 添加链接 Add link</button>
+        <button class="secondary" id="addLinkBtn" type="button">+ 添加链接</button>
       </div>
     </div>
 
     <div class="settings-actions">
-      <button class="primary" id="saveSettingsBtn" type="button" style="margin-top:0;">保存设置 Save settings</button>
+      <button class="primary" id="saveSettingsBtn" type="button" style="margin-top:0;">保存设置</button>
     </div>
     <div class="save-note" id="saveNote"></div>
   </div>
 
   <!-- Ambient sound -->
   <div class="card" id="ambientPanel">
-    <h2>🎧 环境音 Ambient sound</h2>
-    <div class="hint">找点声音陪着你，帮自己更容易进入状态。<br>Some sound to ease you into the task.</div>
+    <h2>🎧 环境音</h2>
+    <div class="hint">找点声音陪着你，帮自己更容易进入状态。</div>
 
     <div class="presets" id="ambientSounds"></div>
 
     <div class="ambient-controls-row">
-      <button class="secondary" id="ambientPlayBtn" type="button">▶️ 播放 Play</button>
-      <label for="ambientVolume">音量 Vol</label>
+      <button class="secondary" id="ambientPlayBtn" type="button">▶️ 播放</button>
+      <label for="ambientVolume">音量</label>
       <input type="range" id="ambientVolume" min="0" max="100" value="65">
     </div>
 
     <div class="field" style="margin-top:16px;">
-      <label style="font-weight:400; font-size:0.85rem; color:var(--text-soft);">定时 Timer</label>
+      <label style="font-weight:400; font-size:0.85rem; color:var(--text-soft);">定时</label>
       <div class="presets" id="ambientTimers"></div>
       <div class="ambient-countdown" id="ambientCountdown"></div>
     </div>
 
     <div class="field" style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
-      <label style="font-weight:400; font-size:0.85rem; color:var(--text-soft);">🔔 颂钵单击 Singing bowl (single strike)</label>
-      <div class="hint">敲一下，让它慢慢余韵消散——想再敲随时点。<br>Strike it once and let the resonance slowly fade — hit it again anytime.</div>
-      <button class="secondary" id="bowlStrikeBtn" type="button">🔔 再敲一次 / Strike again</button>
+      <label style="font-weight:400; font-size:0.85rem; color:var(--text-soft);">🔔 颂钵单击</label>
+      <div class="hint">敲一下，让它慢慢余韵消散——想再敲随时点。</div>
+      <button class="secondary" id="bowlStrikeBtn" type="button">🔔 再敲一次</button>
       <div class="hint" id="bowlAutoStatus"></div>
     </div>
   </div>
@@ -1021,8 +1021,8 @@
 <div class="drawer-backdrop" id="historyBackdrop"></div>
 <div class="history-drawer" id="historyDrawer">
   <div class="history-drawer-header">
-    <h2>📋 历史记录 History</h2>
-    <button class="icon-btn" id="historyCloseBtn" title="关闭 Close">✕</button>
+    <h2>📋 历史记录</h2>
+    <button class="icon-btn" id="historyCloseBtn" title="关闭">✕</button>
   </div>
 
   <div class="history-stats" id="historyStats"></div>
@@ -1031,14 +1031,14 @@
 
   <div class="history-detail" id="historyDetail">
     <div class="history-detail-header">
-      <button type="button" class="history-back-btn" id="historyBackBtn">← 返回列表 Back to list</button>
+      <button type="button" class="history-back-btn" id="historyBackBtn">← 返回列表</button>
     </div>
     <div class="hint" id="historyDetailMeta" style="margin-bottom:10px;"></div>
     <div class="history-detail-thread" id="historyDetailThread"></div>
   </div>
 
   <div class="history-footer">
-    <button class="secondary" id="clearHistoryBtn" type="button">🗑 清除全部 Clear all</button>
+    <button class="secondary" id="clearHistoryBtn" type="button">🗑 清除全部</button>
   </div>
 </div>
 
@@ -1063,32 +1063,32 @@
 
   const MODEL = "claude-sonnet-4-6";
 
-  const DEFAULT_SYSTEM_PROMPT = `你是一位深刻理解 ADHD 与执行功能障碍（executive dysfunction）的教练，正在和用户进行一段多轮对话——不是一次性给答案，而是像一个愿意坐下来陪他们聊聊的朋友。
+  const DEFAULT_SYSTEM_PROMPT = `你是一位深刻理解 ADHD 与执行功能障碍的教练，正在和用户进行一段多轮对话——不是一次性给答案，而是像一个愿意坐下来陪他们聊聊的朋友。
 
 对话背景：用户此刻卡在某件事上，无法开始。第一条消息通常描述的是"表面任务"（比如"要回一封邮件"），但卡住的真正原因，往往藏在表面任务之下——可能是一个还没准备好面对的决定、一种说不清的情绪、对某个结果的恐惧、完美主义、精力枯竭，等等。对话过程中用户也可能提供需要回复的邮件原文。
 
-用户的第一条消息里，可能会附带一个用「[优先级象限 / Priority quadrant: ...]」标出的标签——这是用户自己用"重要/紧急"四象限法给这件事的定位，请据此调整你的开场策略：
+用户的第一条消息里，可能会附带一个用「[优先级象限：...]」标出的标签——这是用户自己用"重要/紧急"四象限法给这件事的定位，请据此调整你的开场策略：
 
-- 🔴 重要且紧急 (Important & Urgent)：不要深入探索。第一轮就直接给出最小、最快能启动的一步，语气紧凑、行动优先，可以用类似"别想了，先做这一步 / Stop thinking, do this one thing right now."的语气开场，然后直接输出**试试这个 / Try this:**（**卡住的原因**可以省略，或只用一句话带过）。
-- 🟡 重要不紧急 (Important, Not Urgent)：这正是最需要深入对话的情况——按下面默认的"先探索、再行动"来做，多花几轮时间，认真挖掘背后的完美主义、恐惧、情绪负担等更深层原因，不要急着给行动。
-- 🟠 不重要但紧急 (Urgent, Not Important)：帮用户又快又"糙"地把它解决掉——"糙"是重点，不追求完美，只求脱手。第一轮就可以直接给模板、草稿或者最省力的做法，不需要深挖情绪。
-- 🟢 不重要不紧急 (Not Important, Not Urgent)：先别急着帮他规划怎么做。第一轮温和地反问一句，比如"这件事真的需要现在做吗？/ Does this actually need your attention right now?"，帮他看看这件事是否真的值得现在花精力，要不要把注意力挪去更重要的事情上。如果用户说这件事其实还是想做/需要做，再转入正常的探索或行动流程。
+- 🔴 重要且紧急：不要深入探索。第一轮就直接给出最小、最快能启动的一步，语气紧凑、行动优先，可以用类似"别想了，先做这一步"的语气开场，然后直接输出**试试这个：**（**卡住的原因**可以省略，或只用一句话带过）。
+- 🟡 重要不紧急：这正是最需要深入对话的情况——按下面默认的"先探索、再行动"来做，多花几轮时间，认真挖掘背后的完美主义、恐惧、情绪负担等更深层原因，不要急着给行动。
+- 🟠 不重要但紧急：帮用户又快又"糙"地把它解决掉——"糙"是重点，不追求完美，只求脱手。第一轮就可以直接给模板、草稿或者最省力的做法，不需要深挖情绪。
+- 🟢 不重要不紧急：先别急着帮他规划怎么做。第一轮温和地反问一句，比如"这件事真的需要现在做吗？"，帮他看看这件事是否真的值得现在花精力，要不要把注意力挪去更重要的事情上。如果用户说这件事其实还是想做/需要做，再转入正常的探索或行动流程。
 
 如果消息里没有象限标签，按下面默认的"先探索、再行动"来处理。
 
 你的行为准则：
 
-1. 第一轮回复（默认情况，或象限是 🟡 重要不紧急时）：不要急着给解决方案。先用1-2句话，温和地反映你注意到的东西——可以是语气、用词、或没说出口的部分，提出一个*可能*的更深层原因（用试探性的语气，不要下定论）。然后问一个开放、温柔的问题，邀请对方多说一点。这一轮**不要**输出"试试这个 / Try this:"这个标题，也不要给出具体行动建议——你还在了解情况。
+1. 第一轮回复（默认情况，或象限是 🟡 重要不紧急时）：不要急着给解决方案。先用1-2句话，温和地反映你注意到的东西——可以是语气、用词、或没说出口的部分，提出一个*可能*的更深层原因（用试探性的语气，不要下定论）。然后问一个开放、温柔的问题，邀请对方多说一点。这一轮**不要**输出"试试这个："这个标题，也不要给出具体行动建议——你还在了解情况。
 
 2. 后续每一轮：继续倾听，用对方的话反映你听到的内容（"听起来你其实是……"），如果真正的卡点还不清楚，就再温柔地追问一层。如果对方已经说出/承认了真正的卡点，或者已经聊了几轮、对方看起来想往前走了，就转入"给出行动"的这一轮：
    - 用这两个标题：
-     **卡住的原因 / What's blocking you:**（现在要点出你们一起挖到的、更深层的真正原因，而不是最初的表面任务）
-     **试试这个 / Try this:**（一个具体、微小、有创意的下一步行动，针对这个更深层的原因量身定制）
+     **卡住的原因：**（现在要点出你们一起挖到的、更深层的真正原因，而不是最初的表面任务）
+     **试试这个：**（一个具体、微小、有创意的下一步行动，针对这个更深层的原因量身定制）
    - 如果用户在对话中提供了需要回复的邮件原文（格式类似"我需要回复的邮件原文："），而这封邮件还没被处理，也加上：
-     **回复草稿 / Draft reply:**（格式完整、可以直接复制粘贴使用的草稿——包含称呼/问候语、分段清楚的正文、结尾礼貌语和署名占位符，例如"[你的名字]"。语气可以放松、不追求完美，但结构要像一封正常的邮件，而不是几句零散的话。）
+     **回复草稿：**（格式完整、可以直接复制粘贴使用的草稿——包含称呼/问候语、分段清楚的正文、结尾礼貌语和署名占位符，例如"[你的名字]"。语气可以放松、不追求完美，但结构要像一封正常的邮件，而不是几句零散的话。）
    - 这个结构只在"给出行动"的那一轮输出一次；之后如果对方继续聊，就自然回应即可，除非又冒出了新的卡点。
 
-3. 如果用户自己在某一轮消息里提出了具体的解决方案或下一步行动——不是你先建议的，而是他们自己想到的：先用一两句话明确认可、肯定这个方案（比如"这个办法很好""就这么办""这确实是个不错的思路"），然后仍然按照上面"给出行动"的格式和标题完整输出一遍——**试试这个 / Try this:**（把用户自己提出的方案清晰地复述、总结成一个具体的下一步，不需要重新发明一个新建议），如果之前几轮还没点出卡住的原因，也可以补上**卡住的原因 / What's blocking you:**。不管这个行动最初是你想出来的还是用户自己想到的，这一轮结束时的格式必须保持一致，并且同样要在最后输出下面第 7 条说的程序标记。
+3. 如果用户自己在某一轮消息里提出了具体的解决方案或下一步行动——不是你先建议的，而是他们自己想到的：先用一两句话明确认可、肯定这个方案（比如"这个办法很好""就这么办""这确实是个不错的思路"），然后仍然按照上面"给出行动"的格式和标题完整输出一遍——**试试这个：**（把用户自己提出的方案清晰地复述、总结成一个具体的下一步，不需要重新发明一个新建议），如果之前几轮还没点出卡住的原因，也可以补上**卡住的原因：**。不管这个行动最初是你想出来的还是用户自己想到的，这一轮结束时的格式必须保持一致，并且同样要在最后输出下面第 7 条说的程序标记。
 
 4. 不要在还没听对方多说一点之前就跳到建议——除非用户在第一句话里已经自己把真正的卡点说得很清楚了，或者象限是 🔴/🟠（见上面的分象限指引），那样可以直接进入"给出行动"。
 
@@ -1096,7 +1096,7 @@
 
 6. 用用户书写时使用的语言回复（中文、英文，或中英混合都可以）。
 
-7. 程序标记（只写给程序看，不是写给用户看，用户不会读到这一行）：只要这一轮回复里包含了具体的下一步行动建议——不管是通过"试试这个 / Try this:"这个环节给出的、在 🔴/🟠 象限下直接给出的模板/草稿/最小行动，还是第 3 条里认可用户自己提出的方案——就必须在整段回复的最末尾另起一行，一字不改地输出：[[ACTION_READY]]。不要加粗、不要解释、不要用任何方式提及这个标记的存在。如果这一轮还在提问、探索、反映感受，没有给出具体行动，就不要输出它。
+7. 程序标记（只写给程序看，不是写给用户看，用户不会读到这一行）：只要这一轮回复里包含了具体的下一步行动建议——不管是通过"试试这个："这个环节给出的、在 🔴/🟠 象限下直接给出的模板/草稿/最小行动，还是第 3 条里认可用户自己提出的方案——就必须在整段回复的最末尾另起一行，一字不改地输出：[[ACTION_READY]]。不要加粗、不要解释、不要用任何方式提及这个标记的存在。如果这一轮还在提问、探索、反映感受，没有给出具体行动，就不要输出它。
 
 记住：这是一段对话，不是问答机——先陪伴、再挖掘、最后才是行动（🔴 和 🟠 象限除外，那两种情况请直接给行动）。`;
 
@@ -1111,75 +1111,75 @@
   // AI responds. Their id/zh/en get embedded in the first message so the
   // system prompt can adapt its strategy per quadrant.
   const QUADRANTS = [
-    { id: "urgent-important", emoji: "🔴", zh: "重要且紧急", en: "Important & Urgent" },
-    { id: "important-not-urgent", emoji: "🟡", zh: "重要不紧急", en: "Important, Not Urgent" },
-    { id: "urgent-not-important", emoji: "🟠", zh: "不重要但紧急", en: "Urgent, Not Important" },
-    { id: "neither", emoji: "🟢", zh: "不重要不紧急", en: "Not Important, Not Urgent" },
+    { id: "urgent-important", emoji: "🔴", zh: "重要且紧急" },
+    { id: "important-not-urgent", emoji: "🟡", zh: "重要不紧急" },
+    { id: "urgent-not-important", emoji: "🟠", zh: "不重要但紧急" },
+    { id: "neither", emoji: "🟢", zh: "不重要不紧急" },
   ];
 
   // Quick-start scenario cards shown on the starter screen — clicking one
   // pre-fills the task box with a starting sentence. Add more anytime.
   const TEMPLATE_SCENARIOS = [
-    { emoji: "📧", zh: "有一封邮件一直没回...", en: "There's an email I keep putting off..." },
-    { emoji: "💬", zh: "有条消息不知道怎么回...", en: "Not sure how to reply to this message..." },
-    { emoji: "📝", zh: "有篇东西要写但不知道怎么开头...", en: "Need to write something but can't start..." },
-    { emoji: "📋", zh: "有个任务拖了很久...", en: "There's a task I've been avoiding..." },
-    { emoji: "🤷", zh: "说不清楚，就是不想动...", en: "I don't know, I just can't get going..." },
+    { emoji: "📧", zh: "有一封邮件一直没回..." },
+    { emoji: "💬", zh: "有条消息不知道怎么回..." },
+    { emoji: "📝", zh: "有篇东西要写但不知道怎么开头..." },
+    { emoji: "📋", zh: "有个任务拖了很久..." },
+    { emoji: "🤷", zh: "说不清楚，就是不想动..." },
   ];
 
   // Ambient sound profiles — each maps to a local mp3 file played on loop
   // (see the Ambient module below). Add a new one by giving it an id/label
   // here and dropping the file alongside index.html.
   const SOUND_PROFILES = [
-    { id: "river", label: "🏞 溪流 River", file: "forest.mp3" },
-    { id: "bowl", label: "🔔 颂钵 Singing bowl", file: "singingbowl.mp3" },
-    { id: "garden", label: "🎋 日式庭院 Japanese garden", file: "music.mp3" },
-    { id: "purr", label: "🐱 猫咪呼噜 Cat purr", file: "purr.mp3" },
-    { id: "tango", label: "💃 探戈 Tango", file: "tango.mp3" },
+    { id: "river", label: "🏞 溪流", file: "forest.mp3" },
+    { id: "bowl", label: "🔔 颂钵", file: "singingbowl.mp3" },
+    { id: "garden", label: "🎋 日式庭院", file: "music.mp3" },
+    { id: "purr", label: "🐱 猫咪呼噜", file: "purr.mp3" },
+    { id: "tango", label: "💃 探戈", file: "tango.mp3" },
   ];
 
   const TIMER_OPTIONS = [
-    { id: 5, label: "5 分钟 5 min" },
-    { id: 15, label: "15 分钟 15 min" },
-    { id: 25, label: "25 分钟 Pomodoro" },
-    { id: 0, label: "∞ 不限时 No limit" },
+    { id: 5, label: "5 分钟" },
+    { id: 15, label: "15 分钟" },
+    { id: 25, label: "25 分钟（番茄钟）" },
+    { id: 0, label: "∞ 不限时" },
   ];
 
   // "⏰ 等一下再做" delay options — how long from now to remind the user.
   const LATER_OPTIONS = [
-    { minutes: 15, zh: "15 分钟后", en: "15 min" },
-    { minutes: 30, zh: "30 分钟后", en: "30 min" },
-    { minutes: 60, zh: "1 小时后", en: "1 hour" },
-    { minutes: 120, zh: "2 小时后", en: "2 hours" },
+    { minutes: 15, zh: "15 分钟后" },
+    { minutes: 30, zh: "30 分钟后" },
+    { minutes: 60, zh: "1 小时后" },
+    { minutes: 120, zh: "2 小时后" },
   ];
 
   const MIC_LANG_OPTIONS = [
     { id: "zh-CN", label: "🌐 中文" },
-    { id: "en-US", label: "🌐 English" },
+    { id: "en-US", label: "🌐 英语" },
   ];
 
   // Lightweight, no-API categorization of the "卡住的原因" text the AI writes,
   // used only for the "most common blocker" insight in the history panel.
   // Add more categories anytime — first pattern match wins.
   const BLOCKER_CATEGORIES = [
-    { id: "perfectionism", zh: "完美主义", en: "Perfectionism", pattern: /完美主义|perfectionis/i },
-    { id: "fear", zh: "恐惧/害怕", en: "Fear", pattern: /恐惧|害怕|fear|afraid/i },
-    { id: "decision", zh: "决策困难", en: "Decision difficulty", pattern: /决策|决定|decision|抉择/i },
-    { id: "overwhelm", zh: "任务过大", en: "Overwhelm", pattern: /overwhelm|太大|压垮|不知从何/i },
-    { id: "energy", zh: "精力不足", en: "Low energy", pattern: /精力|能量|启动|energy|fatigue|exhaust/i },
-    { id: "rejection", zh: "怕被评判", en: "Fear of judgment", pattern: /拒绝|评判|judg|rejection/i },
-    { id: "emotional", zh: "情绪负担", en: "Emotional weight", pattern: /情绪|emotion/i },
-    { id: "boredom", zh: "缺乏兴趣", en: "Boredom", pattern: /无聊|boredom|boring/i },
+    { id: "perfectionism", zh: "完美主义", pattern: /完美主义|perfectionis/i },
+    { id: "fear", zh: "恐惧/害怕", pattern: /恐惧|害怕|fear|afraid/i },
+    { id: "decision", zh: "决策困难", pattern: /决策|决定|decision|抉择/i },
+    { id: "overwhelm", zh: "任务过大", pattern: /overwhelm|太大|压垮|不知从何/i },
+    { id: "energy", zh: "精力不足", pattern: /精力|能量|启动|energy|fatigue|exhaust/i },
+    { id: "rejection", zh: "怕被评判", pattern: /拒绝|评判|judg|rejection/i },
+    { id: "emotional", zh: "情绪负担", pattern: /情绪|emotion/i },
+    { id: "boredom", zh: "缺乏兴趣", pattern: /无聊|boredom|boring/i },
   ];
 
-  // Randomly-chosen encouragement shown after "我做到了 / I did it". Add more anytime.
+  // Randomly-chosen encouragement shown after "我做到了". Add more anytime.
   const COMPLETION_MESSAGES = [
-    "太棒了，你迈出了那一步。 / Nice — you took the step.",
-    "看，没有想象中那么难。 / See, it wasn't as bad as it felt.",
-    "这就够了，为自己鼓掌。 / That's enough for now — give yourself credit.",
-    "启动永远是最难的部分，你做到了。 / Starting is always the hardest part, and you did it.",
-    "干得漂亮。 / Well done.",
-    "又往前挪了一步。 / One more step forward.",
+    "太棒了，你迈出了那一步。",
+    "看，没有想象中那么难。",
+    "这就够了，为自己鼓掌。",
+    "启动永远是最难的部分，你做到了。",
+    "干得漂亮。",
+    "又往前挪了一步。",
   ];
 
   // ---------------------------------------------------------------------
@@ -1221,7 +1221,7 @@
       const row = document.createElement("div");
       row.className = "link-row";
       row.innerHTML = `
-        <input type="text" value="${escapeAttr(link.name)}" placeholder="名称 Name" data-field="name" data-index="${i}">
+        <input type="text" value="${escapeAttr(link.name)}" placeholder="名称" data-field="name" data-index="${i}">
         <input type="url" value="${escapeAttr(link.url)}" placeholder="https://…" data-field="url" data-index="${i}">
         <button class="secondary" type="button" data-remove="${i}">✕</button>
       `;
@@ -1285,7 +1285,7 @@
       .filter((l) => l.name && l.url);
     persistSettings(cleanedLinks.length ? cleanedLinks : DEFAULT_QUICK_LINKS);
     renderQuickLinks();
-    $("saveNote").textContent = "已保存 Saved ✓";
+    $("saveNote").textContent = "已保存 ✓";
     setTimeout(() => { $("saveNote").textContent = ""; }, 2000);
   });
 
@@ -1354,7 +1354,7 @@
       const card = document.createElement("button");
       card.type = "button";
       card.className = "template-card";
-      card.textContent = `${t.emoji} ${t.zh} / ${t.en}`;
+      card.textContent = `${t.emoji} ${t.zh}`;
       card.addEventListener("click", () => {
         const box = $("taskInput");
         box.value = `${t.zh} `;
@@ -1366,7 +1366,7 @@
   }
 
   // ---------------------------------------------------------------------
-  // Daily completion counter — "今天突破了 X 件事 / X things started today"
+  // Daily completion counter — "今天突破了 X 件事"
   // ---------------------------------------------------------------------
 
   function todayKey() {
@@ -1394,7 +1394,7 @@
   function renderStreak() {
     const count = loadCompletionCount();
     $("streakCounter").textContent = count > 0
-      ? `🔥 今天突破了 ${count} 件事 / ${count} thing${count === 1 ? "" : "s"} started today`
+      ? `🔥 今天突破了 ${count} 件事`
       : "";
   }
 
@@ -1731,7 +1731,7 @@
         unsupported = true;
         $("dynamicBgToggle").checked = false;
         $("dynamicBgToggle").disabled = true;
-        $("bgToggleWrap").title = "此设备不支持 WebGL，无法显示动态背景 / WebGL isn't supported on this device";
+        $("bgToggleWrap").title = "此设备不支持 WebGL，无法显示动态背景";
         localStorage.setItem(STORAGE_KEYS.dynamicBg, "0");
         stop();
         return;
@@ -1828,7 +1828,7 @@
           // silently leaving playback broken.
           if (ctx.state !== "running") return ctx.resume();
         }).catch((err) => {
-          showError(`无法启动音频，请再试一次。/ Couldn't start audio — please try again. (${err && err.message ? err.message : err})`);
+          showError(`无法启动音频，请再试一次。(${err && err.message ? err.message : err})`);
         });
       }
       return ctx;
@@ -2014,7 +2014,7 @@
       el.preload = "none";
       el.volume = 0;
       el.addEventListener("error", () => {
-        showError(`音效加载失败 Failed to load sound: ${s.file}`);
+        showError(`音效加载失败：${s.file}`);
       });
       // Belt-and-suspenders on top of loop=true: some browsers silently
       // fail to loop an mp3 whose duration/VBR header metadata is slightly
@@ -2026,7 +2026,7 @@
         if (isPlaying && currentSound === s.id) {
           el.currentTime = 0;
           el.play().catch((err) => {
-            showError(`播放失败 Playback failed: ${err && err.message ? err.message : err}`);
+            showError(`播放失败：${err && err.message ? err.message : err}`);
           });
         }
       });
@@ -2082,7 +2082,7 @@
       const nextType = type || currentSound || SOUND_PROFILES[0].id;
       const nextEl = audioEls[nextType];
       if (!nextEl) {
-        showError(`未知音效 Unknown sound: ${nextType}`);
+        showError(`未知音效：${nextType}`);
         return;
       }
 
@@ -2101,7 +2101,7 @@
       const playPromise = nextEl.play();
       if (playPromise && playPromise.catch) {
         playPromise.catch((err) => {
-          showError(`播放失败 Playback failed: ${err && err.message ? err.message : err}`);
+          showError(`播放失败：${err && err.message ? err.message : err}`);
         });
       }
       isPlaying = true;
@@ -2358,12 +2358,12 @@
     $("ambientTimers").querySelectorAll(".chip").forEach((chip) => {
       chip.classList.toggle("active", Number(chip.dataset.timer) === state.timerMinutes);
     });
-    $("ambientPlayBtn").textContent = state.isPlaying ? "⏸ 暂停 Pause" : "▶️ 播放 Play";
+    $("ambientPlayBtn").textContent = state.isPlaying ? "⏸ 暂停" : "▶️ 播放";
     const countdown = $("ambientCountdown");
     if (state.isPlaying && state.remaining != null) {
-      countdown.textContent = `剩余 ${formatCountdown(state.remaining)} remaining`;
+      countdown.textContent = `剩余 ${formatCountdown(state.remaining)}`;
     } else if (state.isPlaying) {
-      countdown.textContent = "播放中（无时间限制）/ Playing (no timer)";
+      countdown.textContent = "播放中（无时间限制）";
     } else {
       countdown.textContent = "";
     }
@@ -2389,7 +2389,7 @@
     const el = $("bowlAutoStatus");
     if (state.active && state.remaining != null) {
       const t = formatCountdown(state.remaining);
-      el.innerHTML = `🔁 自动敲击中，每隔 15-30 秒一次，还剩 ${t}<br>Auto-striking every 15-30s, ${t} left`;
+      el.innerHTML = `🔁 自动敲击中，每隔 15-30 秒一次，还剩 ${t}`;
     } else {
       el.textContent = "";
     }
@@ -2431,7 +2431,7 @@
   function createVoiceController({ micBtn, statusEl, textarea }) {
     if (!VOICE_SUPPORTED) {
       micBtn.disabled = true;
-      micBtn.title = "该浏览器不支持语音输入 / Voice input not supported in this browser";
+      micBtn.title = "该浏览器不支持语音输入";
       return { start() {}, stop() {}, isRecording: () => false };
     }
 
@@ -2476,8 +2476,8 @@
         // recognition ourselves — not a real problem, so don't surface them.
         if (event.error === "aborted" || event.error === "no-speech") return;
         statusEl.textContent = event.error === "not-allowed"
-          ? "麦克风权限被拒绝 / Microphone permission denied"
-          : `识别出错 Voice error: ${event.error}`;
+          ? "麦克风权限被拒绝"
+          : `识别出错：${event.error}`;
       };
 
       recognition.onend = () => {
@@ -2508,13 +2508,13 @@
       // prompt and catch a rejection.
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         requestingPermission = true;
-        statusEl.textContent = "请求麦克风权限… Requesting mic permission…";
+        statusEl.textContent = "请求麦克风权限…";
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           stream.getTracks().forEach((t) => t.stop());
         } catch (err) {
           requestingPermission = false;
-          statusEl.textContent = "麦克风权限被拒绝 / Microphone permission denied";
+          statusEl.textContent = "麦克风权限被拒绝";
           return;
         }
         requestingPermission = false;
@@ -2528,9 +2528,9 @@
       finalTranscript = "";
       baseValue = textarea.value ? textarea.value + " " : "";
       micBtn.classList.add("recording");
-      micBtn.title = "点击停止 Click to stop";
+      micBtn.title = "点击停止";
       if (micIcon) micIcon.textContent = "⏹";
-      statusEl.textContent = "🔴 录音中… Listening…";
+      statusEl.textContent = "🔴 录音中…";
       launchInstance();
     }
 
@@ -2541,7 +2541,7 @@
     async function addPunctuation(prefix, transcript, generation) {
       const apiKey = localStorage.getItem(STORAGE_KEYS.apiKey) || "";
       if (!apiKey) return;
-      statusEl.textContent = "✏️ 添加标点中… Adding punctuation…";
+      statusEl.textContent = "✏️ 添加标点中…";
       try {
         const punctuated = await callClaude([{ role: "user", content: transcript }], PUNCTUATION_SYSTEM_PROMPT);
         if (generation !== punctuateGeneration) return; // superseded by a newer recording
@@ -2558,7 +2558,7 @@
       if (!recording) return;
       recording = false;
       micBtn.classList.remove("recording");
-      micBtn.title = "点击说话 Click to talk";
+      micBtn.title = "点击说话";
       if (micIcon) micIcon.textContent = "🎤";
       teardown(recognition);
       recognition = null;
@@ -2622,7 +2622,7 @@
   async function callClaude(messages, systemPromptOverride) {
     const apiKey = localStorage.getItem(STORAGE_KEYS.apiKey) || "";
     if (!apiKey) {
-      throw new Error("请先在设置中填入 Anthropic API Key。/ Please add your Anthropic API key in Settings first.");
+      throw new Error("请先在设置中填入 Anthropic API 密钥。");
     }
     const systemPrompt = systemPromptOverride || localStorage.getItem(STORAGE_KEYS.systemPrompt) || DEFAULT_SYSTEM_PROMPT;
 
@@ -2650,17 +2650,17 @@
       } catch { /* ignore parse failure */ }
 
       if (response.status === 401) {
-        throw new Error("API Key 无效，请检查设置。/ Invalid API key — please check Settings.");
+        throw new Error("API 密钥无效，请检查设置。");
       }
       if (response.status === 429) {
-        throw new Error("请求太频繁了，稍等一下再试。/ Rate limited — please wait a moment and try again.");
+        throw new Error("请求太频繁了，稍等一下再试。");
       }
-      throw new Error(`请求失败 Request failed (${response.status})${detail ? ": " + detail : ""}`);
+      throw new Error(`请求失败（${response.status}）${detail ? "：" + detail : ""}`);
     }
 
     const data = await response.json();
     const textBlock = (data.content || []).find((b) => b.type === "text");
-    if (!textBlock) throw new Error("没有收到有效回复。/ No text response received.");
+    if (!textBlock) throw new Error("没有收到有效回复。");
     return textBlock.text;
   }
 
@@ -2801,8 +2801,8 @@
     }
     window.open(getOutlookUrl(), "_blank", "noopener,noreferrer");
     noteEl.textContent = copied
-      ? "已复制草稿，请在 Outlook 中粘贴。记得检查后再发送！/ Draft copied. Paste in Outlook — review before sending!"
-      : "打开了 Outlook，但复制失败，请手动复制草稿。/ Opened Outlook, but copying failed — please copy the draft manually.";
+      ? "已复制草稿，请在 Outlook 中粘贴。记得检查后再发送！"
+      : "打开了 Outlook，但复制失败，请手动复制草稿。";
   }
 
   function addAssistantBubble(text, actionReady) {
@@ -2817,7 +2817,7 @@
       // Ambient-sound suggestion, right where the action was just given.
       const suggest = document.createElement("div");
       suggest.className = "ambient-suggest";
-      suggest.innerHTML = `🎧 放点声音帮自己开始？/ Want some sound to ease in?
+      suggest.innerHTML = `🎧 放点声音帮自己开始？
         <div class="presets">
           ${SOUND_PROFILES.map((s) => `<button type="button" class="chip" data-suggest-sound="${s.id}">${s.label}</button>`).join("")}
         </div>`;
@@ -2835,7 +2835,7 @@
         const copyBtn = document.createElement("button");
         copyBtn.type = "button";
         copyBtn.className = "secondary";
-        copyBtn.textContent = "📋 复制到 Outlook Copy to Outlook";
+        copyBtn.textContent = "📋 复制到 Outlook";
         const draftNote = document.createElement("div");
         draftNote.className = "draft-copy-note";
         copyBtn.addEventListener("click", () => copyDraftToOutlook(draftReply, draftNote));
@@ -2852,7 +2852,7 @@
           const actions = document.createElement("div");
           actions.className = "inline-actions";
           actions.innerHTML = emailLinks
-            .map((l) => `<a class="launch-link" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">📮 打开 Open ${escapeHtml(l.name)}</a>`)
+            .map((l) => `<a class="launch-link" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">📮 打开 ${escapeHtml(l.name)}</a>`)
             .join("");
           div.appendChild(actions);
         }
@@ -2889,7 +2889,7 @@
   function resetCompletionUI() {
     $("completionRow").classList.remove("visible");
     $("completedBtn").disabled = false;
-    $("completedBtn").textContent = "我做到了 ✓ I did it";
+    $("completedBtn").textContent = "我做到了 ✓";
     $("completionMessage").textContent = "";
     $("laterPicker").classList.remove("visible");
   }
@@ -2910,7 +2910,7 @@
     for (const cat of BLOCKER_CATEGORIES) {
       if (cat.pattern.test(text)) return cat;
     }
-    return { id: "other", zh: "其他", en: "Other" };
+    return { id: "other", zh: "其他" };
   }
 
   function loadHistory() {
@@ -2970,13 +2970,13 @@
     const opts = sameYear
       ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
       : { year: "numeric", month: "short", day: "numeric" };
-    return d.toLocaleString(getMicLang().startsWith("zh") ? "zh-CN" : "en-US", opts);
+    return d.toLocaleString("zh-CN", opts);
   }
 
   function renderHistoryStats(history) {
     const wrap = $("historyStats");
     if (!history.length) {
-      wrap.innerHTML = `<div>还没有记录，聊完第一次之后就会出现在这里。/ No history yet — it'll show up after your first conversation.</div>`;
+      wrap.innerHTML = `<div>还没有记录，聊完第一次之后就会出现在这里。</div>`;
       return;
     }
 
@@ -3006,12 +3006,12 @@
     });
 
     const lines = [];
-    lines.push(`<div>📅 本周开始了 <strong>${thisWeekCount}</strong> 件事 / <strong>${thisWeekCount}</strong> thing${thisWeekCount === 1 ? "" : "s"} started this week</div>`);
+    lines.push(`<div>📅 本周开始了 <strong>${thisWeekCount}</strong> 件事</div>`);
     if (topQuadrant) {
-      lines.push(`<div>${topQuadrant.emoji} 最常选的象限 Most picked quadrant: ${topQuadrant.zh} / ${topQuadrant.en}</div>`);
+      lines.push(`<div>${topQuadrant.emoji} 最常选的象限：${topQuadrant.zh}</div>`);
     }
     if (topBlocker) {
-      lines.push(`<div>💭 最常见的卡点 Most common blocker: ${topBlocker.cat.zh} / ${topBlocker.cat.en}</div>`);
+      lines.push(`<div>💭 最常见的卡点：${topBlocker.cat.zh}</div>`);
     }
     wrap.innerHTML = lines.join("");
   }
@@ -3060,7 +3060,7 @@
     $("historyDetailMeta").textContent = [
       formatHistoryDate(record.startedAt),
       record.quadrant ? `${record.quadrant.emoji} ${record.quadrant.zh}` : null,
-      record.completed ? "✅ 完成 Completed" : "⏸ 未完成 Unfinished",
+      record.completed ? "✅ 完成" : "⏸ 未完成",
     ].filter(Boolean).join(" · ");
     $("historyList").style.display = "none";
     $("historyStats").style.display = "none";
@@ -3075,7 +3075,7 @@
     list.innerHTML = "";
 
     if (!history.length) {
-      list.innerHTML = `<div class="history-empty">还没有对话记录。/ No conversations yet.</div>`;
+      list.innerHTML = `<div class="history-empty">还没有对话记录。</div>`;
       return;
     }
 
@@ -3089,7 +3089,7 @@
           <span class="history-item-status">${record.completed ? "✅" : "⏸"}</span>
         </div>
         <div class="history-item-preview">${escapeHtml(preview)}</div>
-        <button type="button" class="history-item-delete" title="删除 Delete">🗑</button>
+        <button type="button" class="history-item-delete" title="删除">🗑</button>
       `;
       item.addEventListener("click", (e) => {
         if (e.target.closest(".history-item-delete")) return;
@@ -3127,7 +3127,7 @@
     $("historyStats").style.display = "";
   });
   $("clearHistoryBtn").addEventListener("click", () => {
-    if (confirm("确定要清除全部历史记录吗？此操作无法撤销。\nClear all history? This cannot be undone.")) {
+    if (confirm("确定要清除全部历史记录吗？此操作无法撤销。")) {
       saveHistoryList([]);
       renderHistoryList();
     }
@@ -3219,8 +3219,8 @@
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     const summary = record.task.length > 80 ? `${record.task.slice(0, 77)}…` : record.task;
     try {
-      const notification = new Notification("现在可以开始了吗？Ready to start?", {
-        body: `你之前说要做的事：${summary}，现在可以开始了吗？\nThe thing you said you'd do: ${summary} — ready now?`,
+      const notification = new Notification("现在可以开始了吗？", {
+        body: `你之前说要做的事：${summary}，现在可以开始了吗？`,
         tag: reminder.id,
       });
       notification.onclick = () => {
@@ -3269,11 +3269,11 @@
 
     resetToHome();
 
-    const option = LATER_OPTIONS.find((o) => o.minutes === minutes) || { zh: `${minutes} 分钟后`, en: `${minutes} min` };
+    const option = LATER_OPTIONS.find((o) => o.minutes === minutes) || { zh: `${minutes} 分钟后` };
     if (permission === "granted") {
-      showNotice(`⏰ 已设置提醒，${option.zh}会提醒你继续。<br>Reminder set — you'll hear from us in ${option.en}.`);
+      showNotice(`⏰ 已设置提醒，${option.zh}会提醒你继续。`);
     } else {
-      showNotice(`⏰ 已记录，但通知权限未开启，到时不会弹提醒——可以在浏览器设置里允许通知。<br>Reminder saved, but notifications aren't enabled — allow them in your browser settings to actually get the popup.`);
+      showNotice(`⏰ 已记录，但通知权限未开启，到时不会弹提醒——可以在浏览器设置里允许通知。`);
     }
   }
 
@@ -3284,7 +3284,7 @@
   function showQuadrantStep() {
     const task = $("taskInput").value.trim();
     if (!task) {
-      showError("先写一句你在逃避的事情吧。/ Describe what you're avoiding first.");
+      showError("先写一句你在逃避的事情吧。");
       return;
     }
     hideError();
@@ -3298,7 +3298,7 @@
   function startConversation(task, quadrant) {
     let content = `我在逃避的事情/感受：\n${task}`;
     if (quadrant) {
-      content += `\n\n[优先级象限 / Priority quadrant: ${quadrant.zh} / ${quadrant.en}]`;
+      content += `\n\n[优先级象限：${quadrant.zh}]`;
     }
     conversation = [{ role: "user", content }];
     emailOffered = false;
@@ -3317,7 +3317,7 @@
     hideNotice();
 
     let displayText = task;
-    if (quadrant) displayText += `\n\n${quadrant.emoji} ${quadrant.zh} / ${quadrant.en}`;
+    if (quadrant) displayText += `\n\n${quadrant.emoji} ${quadrant.zh}`;
     addUserBubble(displayText);
 
     sendConversationTurn();
@@ -3333,7 +3333,7 @@
     let displayText = text;
     if (emailText) {
       content += (content ? "\n\n" : "") + `我需要回复的邮件原文：\n"""\n${emailText}\n"""`;
-      displayText += (displayText ? "\n\n" : "") + "📧 [附上了邮件原文 / pasted an email]";
+      displayText += (displayText ? "\n\n" : "") + "📧 [附上了邮件原文]";
       emailBox.value = "";
       $("emailInlineBox").classList.remove("visible");
     }
@@ -3371,7 +3371,7 @@
     const count = bumpCompletionCount();
     renderStreak();
     $("completedBtn").disabled = true;
-    $("completedBtn").textContent = "✓ 已完成 Logged";
+    $("completedBtn").textContent = "✓ 已完成";
     const msg = COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)];
     $("completionMessage").textContent = msg;
 
@@ -3392,7 +3392,7 @@
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "chip";
-      chip.textContent = `${o.zh} ${o.en}`;
+      chip.textContent = o.zh;
       chip.addEventListener("click", () => scheduleLater(o.minutes));
       wrap.appendChild(chip);
     });
@@ -3441,7 +3441,7 @@
 
   if (!localStorage.getItem(STORAGE_KEYS.apiKey)) {
     setTimeout(() => {
-      showError("欢迎使用！先点右上角 ⚙️ 设置你的 API Key。/ Welcome! Click ⚙️ in the top right to add your API key first.");
+      showError("欢迎使用！先点右上角 ⚙️ 设置你的 API 密钥。");
     }, 300);
   }
 })();
