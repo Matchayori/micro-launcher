@@ -981,6 +981,7 @@
       <label style="font-weight:400; font-size:0.85rem; color:var(--text-soft);">🔔 颂钵单击 Singing bowl (single strike)</label>
       <div class="hint">敲一下，让它慢慢余韵消散——想再敲随时点。<br>Strike it once and let the resonance slowly fade — hit it again anytime.</div>
       <button class="secondary" id="bowlStrikeBtn" type="button">🔔 再敲一次 / Strike again</button>
+      <div class="hint" id="bowlAutoStatus"></div>
     </div>
   </div>
 
@@ -1974,6 +1975,20 @@
       el.addEventListener("error", () => {
         showError(`音效加载失败 Failed to load sound: ${s.file}`);
       });
+      // Belt-and-suspenders on top of loop=true: some browsers silently
+      // fail to loop an mp3 whose duration/VBR header metadata is slightly
+      // off (the file ends a few frames earlier or later than the header
+      // claims), so `ended` fires but native looping never restarts
+      // playback. Force a restart ourselves whenever `ended` fires while
+      // we still expect this sound to be playing.
+      el.addEventListener("ended", () => {
+        if (isPlaying && currentSound === s.id) {
+          el.currentTime = 0;
+          el.play().catch((err) => {
+            showError(`播放失败 Playback failed: ${err && err.message ? err.message : err}`);
+          });
+        }
+      });
       audioEls[s.id] = el;
     });
 
@@ -2200,6 +2215,68 @@
     return { strike };
   })();
 
+  // ---------------------------------------------------------------------
+  // Bowl auto-strike — when the user hits "敲一下" while a timed duration
+  // (5/15/25 min, from the same Timer chips Ambient uses) is selected, keep
+  // striking automatically at random 15-30s intervals until that duration
+  // has elapsed, instead of going silent after the one strike. Selecting
+  // "∞ 不限时" keeps the original manual-only behavior — striking again
+  // with that selected cancels any auto-repeat in progress.
+  // ---------------------------------------------------------------------
+
+  const BowlAutoStrike = (() => {
+    let timeoutId = null;
+    let tickInterval = null;
+    let endsAt = null;
+    let onStateChange = () => {};
+
+    function clearTimers() {
+      if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+      if (tickInterval) { clearInterval(tickInterval); tickInterval = null; }
+    }
+
+    function scheduleNext() {
+      const remaining = endsAt - Date.now();
+      if (remaining <= 0) { stop(); return; }
+      const gap = Math.min(remaining, 15000 + Math.random() * 15000);
+      timeoutId = setTimeout(() => {
+        if (!endsAt || Date.now() >= endsAt) { stop(); return; }
+        SingingBowlStrike.strike();
+        scheduleNext();
+      }, gap);
+    }
+
+    function start(minutes) {
+      clearTimers();
+      if (!minutes) {
+        // 0 = "∞ 不限时" was selected — no bounded duration to auto-repeat
+        // within, so this also doubles as the cancel path: strike once and
+        // stop any previously-scheduled auto-repeat.
+        endsAt = null;
+        onStateChange();
+        return;
+      }
+      endsAt = Date.now() + minutes * 60000;
+      scheduleNext();
+      tickInterval = setInterval(onStateChange, 1000);
+      onStateChange();
+    }
+
+    function stop() {
+      clearTimers();
+      endsAt = null;
+      onStateChange();
+    }
+
+    function getState() {
+      let remaining = null;
+      if (endsAt) remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+      return { active: !!endsAt, remaining };
+    }
+
+    return { start, stop, getState, onChange(fn) { onStateChange = fn; } };
+  })();
+
   function renderAmbientPanel() {
     const soundsWrap = $("ambientSounds");
     soundsWrap.innerHTML = "";
@@ -2266,12 +2343,26 @@
   $("ambientPlayBtn").addEventListener("click", () => Ambient.toggle());
   $("ambientVolume").addEventListener("input", (e) => Ambient.setVolume(Number(e.target.value) / 100));
 
+  function updateBowlAutoStatus() {
+    const state = BowlAutoStrike.getState();
+    const el = $("bowlAutoStatus");
+    if (state.active && state.remaining != null) {
+      const t = formatCountdown(state.remaining);
+      el.innerHTML = `🔁 自动敲击中，每隔 15-30 秒一次，还剩 ${t}<br>Auto-striking every 15-30s, ${t} left`;
+    } else {
+      el.textContent = "";
+    }
+  }
+  BowlAutoStrike.onChange(updateBowlAutoStatus);
+
   $("bowlStrikeBtn").addEventListener("click", () => {
     SingingBowlStrike.strike();
     const btn = $("bowlStrikeBtn");
     btn.classList.remove("struck");
     void btn.offsetWidth; // restart the animation even on rapid re-strikes
     btn.classList.add("struck");
+
+    BowlAutoStrike.start(Ambient.getState().timerMinutes);
   });
 
   function playAmbientFromSuggestion(type) {
