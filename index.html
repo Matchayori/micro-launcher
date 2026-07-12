@@ -827,39 +827,39 @@
   }
 
   /* 4-7-8 breathing guide — fixed bottom-right corner, click to toggle.
-     Static (no animation) until .breathing is added; a thin, semi-
-     transparent white outline so it never competes with the main content. */
+     Isolated under its own class names; nothing here touches any
+     existing selector, so it can't affect the rest of the layout. */
   .breathe-widget {
     position: fixed;
-    right: 18px;
-    bottom: 18px;
-    width: 84px;
+    bottom: 20px;
+    right: 20px;
+    z-index: 500;
+    width: 60px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
+    background: none;
+    border: none;
+    padding: 0;
     cursor: pointer;
-    z-index: 500;
-    user-select: none;
     -webkit-tap-highlight-color: transparent;
   }
-  .breathe-figure {
+  .breathe-widget svg {
     display: block;
-    opacity: 0.5;
+    opacity: 0.55;
     transition: opacity 0.2s;
   }
-  .breathe-widget:hover .breathe-figure { opacity: 0.8; }
-  .breathe-figure circle,
-  .breathe-figure line,
-  .breathe-figure ellipse {
+  .breathe-widget:hover svg { opacity: 0.85; }
+  .breathe-widget svg circle,
+  .breathe-widget svg line,
+  .breathe-widget svg ellipse {
     fill: none;
     stroke: #fff;
     stroke-width: 2;
     stroke-linecap: round;
   }
   .breathe-chest {
-    /* Scaling needs to happen around the ellipse's own center, not the
-       SVG viewport's 0,0 origin. */
     transform-box: fill-box;
     transform-origin: 50% 50%;
   }
@@ -867,8 +867,8 @@
     position: relative;
     width: 100%;
     height: 16px;
-    font-size: 0.72rem;
-    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.8);
     text-align: center;
   }
   .breathe-phase {
@@ -886,8 +886,8 @@
      whole loop: 4/19=21.053%, 11/19=57.895%, 19/19=100%. */
   @keyframes breatheChest {
     0%      { transform: scale(1, 1); animation-timing-function: ease-in-out; }
-    21.053% { transform: scale(1.32, 1.12); animation-timing-function: linear; }
-    57.895% { transform: scale(1.32, 1.12); animation-timing-function: ease-in-out; }
+    21.053% { transform: scale(1.3, 1.1); animation-timing-function: linear; }
+    57.895% { transform: scale(1.3, 1.1); animation-timing-function: ease-in-out; }
     100%    { transform: scale(1, 1); }
   }
   @keyframes breathePhaseIn {
@@ -1127,9 +1127,9 @@
   </div>
 </div>
 
-<!-- 4-7-8 breathing guide — fixed corner widget, click to start/stop -->
-<div class="breathe-widget" id="breatheWidget" title="点击开始/停止 4-7-8 呼吸引导">
-  <svg class="breathe-figure" viewBox="0 0 60 100" width="44" height="72" aria-hidden="true">
+<!-- 4-7-8 breathing guide — fixed corner button, click to start/stop -->
+<button type="button" class="breathe-widget" id="breatheWidget" title="点击开始/停止 4-7-8 呼吸引导">
+  <svg viewBox="0 0 60 100" width="44" height="72" aria-hidden="true">
     <circle class="breathe-head" cx="30" cy="14" r="9"></circle>
     <line class="breathe-limb" x1="30" y1="30" x2="12" y2="50"></line>
     <line class="breathe-limb" x1="30" y1="30" x2="48" y2="50"></line>
@@ -1142,7 +1142,7 @@
     <span class="breathe-phase breathe-phase-hold">屏 7s</span>
     <span class="breathe-phase breathe-phase-out">呼 8s</span>
   </div>
-</div>
+</button>
 
 <script>
 (() => {
