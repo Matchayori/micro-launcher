@@ -828,7 +828,11 @@
 
   /* 4-7-8 breathing guide — fixed bottom-right corner, click to toggle.
      Isolated under its own class names; nothing here touches any
-     existing selector, so it can't affect the rest of the layout. */
+     existing selector, so it can't affect the rest of the layout. The
+     scale animation itself is driven from JS (see the Breathing module),
+     one setTimeout per phase, since the 4/7/8-second phases are unequal
+     and awkward to keep in sync as a single looping CSS @keyframes. CSS
+     here only supplies the transition easing for whatever scale JS sets. */
   .breathe-widget {
     position: fixed;
     bottom: 20px;
@@ -847,68 +851,28 @@
   }
   .breathe-widget svg {
     display: block;
-    opacity: 0.55;
+    opacity: 0.6;
+    transform: scale(1);
     transition: opacity 0.2s;
   }
-  .breathe-widget:hover svg { opacity: 0.85; }
-  .breathe-widget svg circle,
-  .breathe-widget svg line,
-  .breathe-widget svg ellipse {
+  .breathe-widget:hover svg { opacity: 0.9; }
+  .breathe-widget svg .breathe-stroke {
     fill: none;
     stroke: #fff;
     stroke-width: 2;
     stroke-linecap: round;
+    stroke-linejoin: round;
   }
-  .breathe-chest {
-    transform-box: fill-box;
-    transform-origin: 50% 50%;
+  .breathe-widget svg .breathe-star {
+    fill: #fff;
+    opacity: 0.85;
   }
   .breathe-label {
-    position: relative;
     width: 100%;
     height: 16px;
     font-size: 0.7rem;
     color: rgba(255, 255, 255, 0.8);
     text-align: center;
-  }
-  .breathe-phase {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-  }
-
-  .breathe-widget.breathing .breathe-chest { animation: breatheChest 19s infinite; }
-  .breathe-widget.breathing .breathe-phase-in { animation: breathePhaseIn 19s linear infinite; }
-  .breathe-widget.breathing .breathe-phase-hold { animation: breathePhaseHold 19s linear infinite; }
-  .breathe-widget.breathing .breathe-phase-out { animation: breathePhaseOut 19s linear infinite; }
-
-  /* 19s cycle = 4s inhale + 7s hold + 8s exhale, as percentages of the
-     whole loop: 4/19=21.053%, 11/19=57.895%, 19/19=100%. */
-  @keyframes breatheChest {
-    0%      { transform: scale(1, 1); animation-timing-function: ease-in-out; }
-    21.053% { transform: scale(1.3, 1.1); animation-timing-function: linear; }
-    57.895% { transform: scale(1.3, 1.1); animation-timing-function: ease-in-out; }
-    100%    { transform: scale(1, 1); }
-  }
-  @keyframes breathePhaseIn {
-    0%      { opacity: 1; }
-    21.053% { opacity: 1; }
-    22%     { opacity: 0; }
-    100%    { opacity: 0; }
-  }
-  @keyframes breathePhaseHold {
-    0%      { opacity: 0; }
-    20%     { opacity: 0; }
-    21.053% { opacity: 1; }
-    57.895% { opacity: 1; }
-    59%     { opacity: 0; }
-    100%    { opacity: 0; }
-  }
-  @keyframes breathePhaseOut {
-    0%      { opacity: 0; }
-    56.9%   { opacity: 0; }
-    57.895% { opacity: 1; }
-    100%    { opacity: 1; }
   }
 </style>
 </head>
@@ -1129,19 +1093,20 @@
 
 <!-- 4-7-8 breathing guide — fixed corner button, click to start/stop -->
 <button type="button" class="breathe-widget" id="breatheWidget" title="点击开始/停止 4-7-8 呼吸引导">
-  <svg viewBox="0 0 60 100" width="44" height="72" aria-hidden="true">
-    <circle class="breathe-head" cx="30" cy="14" r="9"></circle>
-    <line class="breathe-limb" x1="30" y1="30" x2="12" y2="50"></line>
-    <line class="breathe-limb" x1="30" y1="30" x2="48" y2="50"></line>
-    <ellipse class="breathe-chest" cx="30" cy="44" rx="11" ry="20"></ellipse>
-    <line class="breathe-limb" x1="30" y1="62" x2="16" y2="92"></line>
-    <line class="breathe-limb" x1="30" y1="62" x2="44" y2="92"></line>
+  <svg id="breatheSvg" viewBox="0 0 64 64" width="48" height="48" aria-hidden="true">
+    <circle class="breathe-stroke" cx="32" cy="14" r="7"></circle>
+    <path class="breathe-stroke" d="M32 22
+      C 25 22, 18 26, 15 33
+      C 12 39, 8 43, 6 47
+      C 4 51, 9 53, 15 51
+      C 18 55, 24 58, 32 58
+      C 40 58, 46 55, 49 51
+      C 55 53, 60 51, 58 47
+      C 56 43, 52 39, 49 33
+      C 46 26, 39 22, 32 22 Z"></path>
+    <path class="breathe-star" d="M52 3 L53.3 7.5 L57.5 9 L53.3 10.5 L52 15 L50.7 10.5 L46.5 9 L50.7 7.5 Z"></path>
   </svg>
-  <div class="breathe-label">
-    <span class="breathe-phase breathe-phase-in">吸 4s</span>
-    <span class="breathe-phase breathe-phase-hold">屏 7s</span>
-    <span class="breathe-phase breathe-phase-out">呼 8s</span>
-  </div>
+  <div class="breathe-label" id="breatheLabel"></div>
 </button>
 
 <script>
@@ -3529,10 +3494,71 @@
     $("taskInput").focus();
   });
 
-  // 4-7-8 breathing guide — purely a CSS animation toggle, no state to
-  // track beyond the class itself.
+  // ---------------------------------------------------------------------
+  // 4-7-8 breathing guide — the 4s/7s/8s phases are unequal, which is
+  // awkward to keep in sync as a single looping CSS @keyframes animation
+  // (easy for the percentages to drift out of sync with the label text).
+  // JS drives it explicitly instead: one setTimeout per phase, each one
+  // setting the SVG's transform/transition and the label text directly.
+  // A generation counter invalidates any timeouts left over from a
+  // previous start/stop cycle so they can't fire after the fact.
+  // ---------------------------------------------------------------------
+
+  const Breathing = (() => {
+    const PHASES = [
+      { key: "in", seconds: 4, label: "吸 4s", scale: 1.3 },
+      { key: "hold", seconds: 7, label: "屏 7s", scale: 1.3 },
+      { key: "out", seconds: 8, label: "呼 8s", scale: 1 },
+    ];
+
+    let active = false;
+    let generation = 0;
+
+    function applyPhase(phase) {
+      const svg = $("breatheSvg");
+      const label = $("breatheLabel");
+      svg.style.transition = `transform ${phase.seconds}s ease-in-out`;
+      svg.style.transform = `scale(${phase.scale})`;
+      label.textContent = phase.label;
+      console.log(`[breathing] phase="${phase.key}" -> scale(${phase.scale}) over ${phase.seconds}s`);
+    }
+
+    function runPhase(myGeneration, phaseIndex) {
+      if (!active || myGeneration !== generation) return;
+      const phase = PHASES[phaseIndex];
+      applyPhase(phase);
+      setTimeout(() => {
+        runPhase(myGeneration, (phaseIndex + 1) % PHASES.length);
+      }, phase.seconds * 1000);
+    }
+
+    function start() {
+      active = true;
+      generation++;
+      console.log("[breathing] start (generation", generation, ")");
+      runPhase(generation, 0);
+    }
+
+    function stop() {
+      console.log("[breathing] stop");
+      active = false;
+      generation++; // invalidates any pending runPhase/setTimeout from this run
+      const svg = $("breatheSvg");
+      svg.style.transition = "transform 0.3s ease";
+      svg.style.transform = "scale(1)";
+      $("breatheLabel").textContent = "";
+    }
+
+    function toggle() {
+      if (active) stop(); else start();
+    }
+
+    return { toggle };
+  })();
+
   $("breatheWidget").addEventListener("click", () => {
-    $("breatheWidget").classList.toggle("breathing");
+    console.log("[breathing] widget clicked");
+    Breathing.toggle();
   });
 
   // ---------------------------------------------------------------------
