@@ -611,6 +611,29 @@
   .later-picker.visible { display: block; }
   .later-picker .presets { justify-content: center; }
 
+  .completion-feedback { display: none; margin-top: 4px; text-align: left; }
+  .completion-feedback.visible { display: block; }
+  .feedback-stars-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .feedback-star-label { font-size: 0.85rem; color: var(--text-soft); }
+  .star-rating { display: flex; gap: 3px; }
+  .star-rating .star {
+    cursor: pointer;
+    font-size: 1.35rem;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.25);
+    transition: color 0.15s, transform 0.1s;
+  }
+  .star-rating .star:hover { transform: scale(1.15); }
+  .star-rating .star.filled { color: var(--accent); }
+  #feedbackNote { margin-bottom: 12px; }
+  .feedback-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+
   .notice-box {
     display: none;
     margin-top: 16px;
@@ -796,6 +819,14 @@
     overflow-y: visible;
   }
   .history-detail-thread .bubble { max-width: 100%; }
+  .history-feedback {
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--accent-soft);
+    font-size: 0.85rem;
+    color: var(--text-soft);
+    line-height: 1.6;
+  }
 
   .history-footer {
     margin-top: 16px;
@@ -958,7 +989,7 @@
       <div class="chat-thread" id="chatThread"></div>
 
       <div class="completion-row" id="completionRow">
-        <div class="completion-buttons">
+        <div class="completion-buttons" id="completionButtons">
           <button class="primary" id="completedBtn" type="button">我做到了 ✓</button>
           <button class="secondary" id="laterBtn" type="button">⏰ 等一下再做</button>
         </div>
@@ -966,6 +997,27 @@
           <div class="hint">提醒我，过：</div>
           <div class="presets" id="laterOptions"></div>
         </div>
+
+        <div class="completion-feedback" id="completionFeedback">
+          <div class="feedback-stars-row">
+            <span class="feedback-star-label">预期启动难度</span>
+            <div class="star-rating" id="starExpected" data-rating="0"></div>
+          </div>
+          <div class="feedback-stars-row">
+            <span class="feedback-star-label">实际启动难度</span>
+            <div class="star-rating" id="starActual" data-rating="0"></div>
+          </div>
+          <div class="feedback-stars-row">
+            <span class="feedback-star-label">成就感</span>
+            <div class="star-rating" id="starSatisfaction" data-rating="0"></div>
+          </div>
+          <textarea id="feedbackNote" rows="2" placeholder="想记录点什么？灵感、感受、成品都可以"></textarea>
+          <div class="feedback-actions">
+            <button class="secondary" id="feedbackSkipBtn" type="button">跳过</button>
+            <button class="primary" id="feedbackDoneBtn" type="button">完成</button>
+          </div>
+        </div>
+
         <div class="completion-message" id="completionMessage"></div>
       </div>
 
@@ -1159,11 +1211,13 @@
 
 4. 不要在还没听对方多说一点之前就跳到建议——除非用户在第一句话里已经自己把真正的卡点说得很清楚了，或者象限是 🔴/🟠（见上面的分象限指引），那样可以直接进入"给出行动"。
 
-5. 语气：温暖、不评判、简短——这个人此刻的执行功能容量很低，不需要长篇大论、不要说教、不要免责声明。每一轮回复通常只需要2-4句话。
+5. 每一次输出**试试这个：**（不管是第2条的默认流程、第3条认可用户自己的方案，还是🔴/🟠象限下的快速版本），都要在这句行动建议里自然带上一个预估完成时间——用一个简短的说法交代大概要多久，比如"大约3分钟"、"大约20秒"、"用不了1分钟"。这个估计要贴合这一步实际需要的时间：写邮件开头一句话可能只要20秒，深呼吸一次可能是1分钟，读完一段材料可能要5分钟——不要每次都写成一样的时长。
 
-6. 用用户书写时使用的语言回复（中文、英文，或中英混合都可以）。
+6. 语气：温暖、不评判、简短——这个人此刻的执行功能容量很低，不需要长篇大论、不要说教、不要免责声明。每一轮回复通常只需要2-4句话。
 
-7. 程序标记（只写给程序看，不是写给用户看，用户不会读到这一行）：只要这一轮回复里包含了具体的下一步行动建议——不管是通过"试试这个："这个环节给出的、在 🔴/🟠 象限下直接给出的模板/草稿/最小行动，还是第 3 条里认可用户自己提出的方案——就必须在整段回复的最末尾另起一行，一字不改地输出：[[ACTION_READY]]。不要加粗、不要解释、不要用任何方式提及这个标记的存在。如果这一轮还在提问、探索、反映感受，没有给出具体行动，就不要输出它。
+7. 用用户书写时使用的语言回复（中文、英文，或中英混合都可以）。
+
+8. 程序标记（只写给程序看，不是写给用户看，用户不会读到这一行）：只要这一轮回复里包含了具体的下一步行动建议——不管是通过"试试这个："这个环节给出的、在 🔴/🟠 象限下直接给出的模板/草稿/最小行动，还是第 3 条里认可用户自己提出的方案——就必须在整段回复的最末尾另起一行，一字不改地输出：[[ACTION_READY]]。不要加粗、不要解释、不要用任何方式提及这个标记的存在。如果这一轮还在提问、探索、反映感受，没有给出具体行动，就不要输出它。
 
 记住：这是一段对话，不是问答机——先陪伴、再挖掘、最后才是行动（🔴 和 🟠 象限除外，那两种情况请直接给行动）。`;
 
@@ -2953,12 +3007,58 @@
     }
   }
 
+  // ---------------------------------------------------------------------
+  // Post-completion feedback — three optional 1-5 star ratings plus a free
+  // -text note, shown after "我做到了" instead of completing immediately.
+  // Entirely skippable: "跳过" finishes with no feedback recorded at all.
+  // ---------------------------------------------------------------------
+
+  const STAR_RATING_IDS = ["starExpected", "starActual", "starSatisfaction"];
+
+  function updateStarsDisplay(container) {
+    const rating = Number(container.dataset.rating || 0);
+    container.querySelectorAll(".star").forEach((star) => {
+      star.classList.toggle("filled", Number(star.dataset.value) <= rating);
+    });
+  }
+
+  function renderStarRating(container) {
+    container.innerHTML = "";
+    for (let i = 1; i <= 5; i++) {
+      const star = document.createElement("span");
+      star.className = "star";
+      star.textContent = "★";
+      star.dataset.value = i;
+      star.addEventListener("click", () => {
+        // Clicking the currently-selected star again clears it — keeps
+        // every rating truly optional, even after an accidental click.
+        const current = Number(container.dataset.rating || 0);
+        container.dataset.rating = current === i ? 0 : i;
+        updateStarsDisplay(container);
+      });
+      container.appendChild(star);
+    }
+    updateStarsDisplay(container);
+  }
+
+  function resetFeedbackForm() {
+    STAR_RATING_IDS.forEach((id) => {
+      const el = $(id);
+      el.dataset.rating = "0";
+      updateStarsDisplay(el);
+    });
+    $("feedbackNote").value = "";
+  }
+
   function resetCompletionUI() {
     $("completionRow").classList.remove("visible");
+    $("completionButtons").style.display = "";
     $("completedBtn").disabled = false;
     $("completedBtn").textContent = "我做到了 ✓";
     $("completionMessage").textContent = "";
     $("laterPicker").classList.remove("visible");
+    $("completionFeedback").classList.remove("visible");
+    resetFeedbackForm();
   }
 
   // ---------------------------------------------------------------------
@@ -3002,10 +3102,11 @@
     return null;
   }
 
-  function saveCurrentSession(completed) {
+  function saveCurrentSession(completed, feedback) {
     if (!currentSessionId || conversation.length === 0) return;
     const history = loadHistory();
     const idx = history.findIndex((h) => h.id === currentSessionId);
+    const existing = idx >= 0 ? history[idx] : null;
     const record = {
       id: currentSessionId,
       startedAt: currentSessionMeta.startedAt,
@@ -3015,6 +3116,10 @@
       messages: conversation.map((m) => ({ role: m.role, content: m.content })),
       completed,
       blocker: findBlockerInConversation(conversation),
+      // Preserve feedback already saved from a previous call (e.g. the
+      // "等一下再做" flow calls this before feedback exists) unless this
+      // call is the one actually supplying it.
+      feedback: feedback !== undefined ? feedback : (existing ? existing.feedback : null),
     };
     if (idx >= 0) history[idx] = record;
     else history.unshift(record);
@@ -3114,6 +3219,11 @@
     renderHistoryList();
   }
 
+  function formatStars(n) {
+    if (!n) return null;
+    return "★".repeat(n) + "☆".repeat(5 - n);
+  }
+
   function openHistoryDetail(record) {
     const thread = $("historyDetailThread");
     thread.innerHTML = "";
@@ -3124,6 +3234,22 @@
       else div.innerHTML = renderLite(m.content);
       thread.appendChild(div);
     });
+
+    if (record.feedback) {
+      const fb = record.feedback;
+      const lines = [];
+      if (fb.expectedDifficulty) lines.push(`预期启动难度：${formatStars(fb.expectedDifficulty)}`);
+      if (fb.actualDifficulty) lines.push(`实际启动难度：${formatStars(fb.actualDifficulty)}`);
+      if (fb.satisfaction) lines.push(`成就感：${formatStars(fb.satisfaction)}`);
+      if (fb.note) lines.push(`📝 ${fb.note}`);
+      if (lines.length) {
+        const div = document.createElement("div");
+        div.className = "history-feedback";
+        div.innerHTML = lines.map((l) => escapeHtml(l)).join("<br>");
+        thread.appendChild(div);
+      }
+    }
+
     $("historyDetailMeta").textContent = [
       formatHistoryDate(record.startedAt),
       record.quadrant ? `${record.quadrant.emoji} ${record.quadrant.zh}` : null,
@@ -3434,23 +3560,45 @@
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") continueConversation();
   });
 
+  // Clicking "我做到了" doesn't finish right away — it opens the optional
+  // feedback step first. Finishing (via "完成" or "跳过") is what actually
+  // logs the completion.
   $("completedBtn").addEventListener("click", () => {
-    const count = bumpCompletionCount();
+    $("completionButtons").style.display = "none";
+    $("laterPicker").classList.remove("visible");
+    resetFeedbackForm();
+    $("completionFeedback").classList.add("visible");
+  });
+
+  function finalizeCompletion(feedback) {
+    $("completionFeedback").classList.remove("visible");
+    bumpCompletionCount();
     renderStreak();
-    $("completedBtn").disabled = true;
-    $("completedBtn").textContent = "✓ 已完成";
     const msg = COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)];
-    $("completionMessage").textContent = msg;
+    $("completionMessage").textContent = `✓ 已完成 — ${msg}`;
 
     // Saving history is the part that actually matters — do it before the
     // decorative chime/confetti so a broken AudioContext (seen for real on
     // some Safari setups) can't throw and silently skip the save.
     currentSessionCompleted = true;
-    saveCurrentSession(true);
+    saveCurrentSession(true, feedback);
     if ($("historyDrawer").classList.contains("open")) renderHistoryList();
 
     try { Celebration.play(); } catch { /* decorative — never block completion on this */ }
     try { launchConfetti(); } catch { /* decorative — never block completion on this */ }
+  }
+
+  $("feedbackSkipBtn").addEventListener("click", () => finalizeCompletion(null));
+
+  $("feedbackDoneBtn").addEventListener("click", () => {
+    const feedback = {
+      expectedDifficulty: Number($("starExpected").dataset.rating || 0) || null,
+      actualDifficulty: Number($("starActual").dataset.rating || 0) || null,
+      satisfaction: Number($("starSatisfaction").dataset.rating || 0) || null,
+      note: $("feedbackNote").value.trim() || null,
+    };
+    const hasFeedback = feedback.expectedDifficulty || feedback.actualDifficulty || feedback.satisfaction || feedback.note;
+    finalizeCompletion(hasFeedback ? feedback : null);
   });
 
   (function renderLaterOptions() {
@@ -3569,6 +3717,7 @@
   renderTemplateCards();
   renderAmbientPanel();
   renderMicLangOptions();
+  STAR_RATING_IDS.forEach((id) => renderStarRating($(id)));
   Ambient.select(SOUND_PROFILES[0].id);
   renderStreak();
   DynamicBg.init();
