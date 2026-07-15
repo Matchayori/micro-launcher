@@ -216,10 +216,9 @@
 
   /* Mic-enabled text inputs */
   .input-with-mic { position: relative; }
-  .input-with-mic textarea { padding-right: 52px; }
-  .mic-btn {
+  .input-with-mic textarea { padding-right: 94px; }
+  .mic-btn, .image-btn {
     position: absolute;
-    right: 8px;
     bottom: 8px;
     width: 36px;
     height: 36px;
@@ -236,7 +235,9 @@
     font-size: 1rem;
     transition: background 0.15s, color 0.15s;
   }
-  .mic-btn:hover { border-color: var(--accent-soft); color: var(--accent); }
+  .mic-btn { right: 8px; }
+  .image-btn { right: 50px; }
+  .mic-btn:hover, .image-btn:hover { border-color: var(--accent-soft); color: var(--accent); }
   .mic-btn.recording {
     background: var(--warn-text);
     color: #fff;
@@ -273,6 +274,62 @@
     font-size: 0.78rem;
     color: var(--accent);
   }
+
+  /* Image attachments — file-picker preview row above the textarea, and
+     the small thumbnails shown inline once a message with images is sent. */
+  .image-preview-row {
+    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .image-preview-row.visible { display: flex; }
+  .image-preview-item {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .image-preview-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .image-preview-remove {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--warn-text);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .bubble-images { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .bubble-images img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; display: block; }
+
+  /* Small inline "复制" button appended next to each paragraph inside a
+     draft/fill-in section (回复草稿 / 填写内容) of an assistant reply. */
+  .para-copy-btn {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 9px;
+    font-size: 0.72rem;
+    border-radius: 999px;
+    border: 1px solid var(--accent-soft);
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    vertical-align: middle;
+  }
+  .para-copy-btn:hover { background: var(--accent-bg); }
+  .para-copy-btn:disabled { opacity: 0.75; cursor: default; }
 
   .presets {
     display: flex;
@@ -941,9 +998,12 @@
         <label for="taskInput">今天卡在哪儿了？</label>
         <div class="hint">打字，或点击 🎤 开始/停止说话（也可按住空格键）。</div>
 
+        <div class="image-preview-row" id="taskImagePreview"></div>
         <div class="input-with-mic">
           <textarea id="taskInput" placeholder="例如：我需要回复导师的邮件，但一想到打开邮箱就很抗拒…&#10;e.g. I need to reply to my advisor's email but I feel a wall of resistance just thinking about opening my inbox…" autofocus></textarea>
+          <button class="image-btn" id="taskImageBtn" type="button" title="添加图片">📎</button>
           <button class="mic-btn" id="taskMicBtn" type="button" title="点击说话"><span class="mic-icon">🎤</span><span class="mic-recording-dot" aria-hidden="true"></span></button>
+          <input type="file" id="taskImageInput" accept="image/jpeg,image/png,image/heic,image/webp" multiple hidden>
         </div>
         <div class="mic-meta" id="taskMicStatus"></div>
 
@@ -1027,10 +1087,13 @@
         <textarea id="emailInlineInput" placeholder="粘贴邮件原文… 发送下一条消息时会自动附上。"></textarea>
       </div>
 
+      <div class="image-preview-row" id="replyImagePreview"></div>
       <div class="reply-row">
         <div class="input-with-mic">
           <textarea id="replyInput" rows="2" placeholder="继续说…"></textarea>
+          <button class="image-btn" id="replyImageBtn" type="button" title="添加图片">📎</button>
           <button class="mic-btn" id="replyMicBtn" type="button" title="点击说话"><span class="mic-icon">🎤</span><span class="mic-recording-dot" aria-hidden="true"></span></button>
+          <input type="file" id="replyImageInput" accept="image/jpeg,image/png,image/heic,image/webp" multiple hidden>
         </div>
         <button class="icon-btn" id="replySendBtn" title="发送" type="button">➤</button>
       </div>
@@ -1207,17 +1270,21 @@
      **回复草稿：**（格式完整、可以直接复制粘贴使用的草稿——包含称呼/问候语、分段清楚的正文、结尾礼貌语和署名占位符，例如"[你的名字]"。语气可以放松、不追求完美，但结构要像一封正常的邮件，而不是几句零散的话。）
    - 这个结构只在"给出行动"的那一轮输出一次；之后如果对方继续聊，就自然回应即可，除非又冒出了新的卡点。
 
-3. 如果用户自己在某一轮消息里提出了具体的解决方案或下一步行动——不是你先建议的，而是他们自己想到的：先用一两句话明确认可、肯定这个方案（比如"这个办法很好""就这么办""这确实是个不错的思路"），然后仍然按照上面"给出行动"的格式和标题完整输出一遍——**试试这个：**（把用户自己提出的方案清晰地复述、总结成一个具体的下一步，不需要重新发明一个新建议），如果之前几轮还没点出卡住的原因，也可以补上**卡住的原因：**。不管这个行动最初是你想出来的还是用户自己想到的，这一轮结束时的格式必须保持一致，并且同样要在最后输出下面第 7 条说的程序标记。
+3. 如果用户上传了图片（比如邮件截图、申请表、文档等）：先仔细看图片里的实际内容，结合用户用文字描述的卡点，给出针对性的建议——不要只泛泛而谈，要具体说出图片里看到了什么。
+   - 如果图片是一封需要回复的邮件，按上面第2条的规则处理，输出**回复草稿：**。
+   - 如果图片是需要填写的表格、申请表等，改用**填写内容：**这个标题（同样要求格式完整、可以直接复制粘贴使用，逐项对应图片里的字段给出具体填写内容；某个字段看不清或拿不准，就留空并注明"需要你确认"，不要瞎编）。
 
-4. 不要在还没听对方多说一点之前就跳到建议——除非用户在第一句话里已经自己把真正的卡点说得很清楚了，或者象限是 🔴/🟠（见上面的分象限指引），那样可以直接进入"给出行动"。
+4. 如果用户自己在某一轮消息里提出了具体的解决方案或下一步行动——不是你先建议的，而是他们自己想到的：先用一两句话明确认可、肯定这个方案（比如"这个办法很好""就这么办""这确实是个不错的思路"），然后仍然按照上面"给出行动"的格式和标题完整输出一遍——**试试这个：**（把用户自己提出的方案清晰地复述、总结成一个具体的下一步，不需要重新发明一个新建议），如果之前几轮还没点出卡住的原因，也可以补上**卡住的原因：**。不管这个行动最初是你想出来的还是用户自己想到的，这一轮结束时的格式必须保持一致，并且同样要在最后输出下面第 9 条说的程序标记。
 
-5. 每一次输出**试试这个：**（不管是第2条的默认流程、第3条认可用户自己的方案，还是🔴/🟠象限下的快速版本），都要在这句行动建议里自然带上一个预估完成时间——用一个简短的说法交代大概要多久，比如"大约3分钟"、"大约20秒"、"用不了1分钟"。这个估计要贴合这一步实际需要的时间：写邮件开头一句话可能只要20秒，深呼吸一次可能是1分钟，读完一段材料可能要5分钟——不要每次都写成一样的时长。
+5. 不要在还没听对方多说一点之前就跳到建议——除非用户在第一句话里已经自己把真正的卡点说得很清楚了，或者象限是 🔴/🟠（见上面的分象限指引），那样可以直接进入"给出行动"。
 
-6. 语气：温暖、不评判、简短——这个人此刻的执行功能容量很低，不需要长篇大论、不要说教、不要免责声明。每一轮回复通常只需要2-4句话。
+6. 每一次输出**试试这个：**（不管是第2条的默认流程、第4条认可用户自己的方案，还是🔴/🟠象限下的快速版本），都要在这句行动建议里自然带上一个预估完成时间——用一个简短的说法交代大概要多久，比如"大约3分钟"、"大约20秒"、"用不了1分钟"。这个估计要贴合这一步实际需要的时间：写邮件开头一句话可能只要20秒，深呼吸一次可能是1分钟，读完一段材料可能要5分钟——不要每次都写成一样的时长。
 
-7. 用用户书写时使用的语言回复（中文、英文，或中英混合都可以）。
+7. 语气：温暖、不评判、简短——这个人此刻的执行功能容量很低，不需要长篇大论、不要说教、不要免责声明。每一轮回复通常只需要2-4句话。
 
-8. 程序标记（只写给程序看，不是写给用户看，用户不会读到这一行）：只要这一轮回复里包含了具体的下一步行动建议——不管是通过"试试这个："这个环节给出的、在 🔴/🟠 象限下直接给出的模板/草稿/最小行动，还是第 3 条里认可用户自己提出的方案——就必须在整段回复的最末尾另起一行，一字不改地输出：[[ACTION_READY]]。不要加粗、不要解释、不要用任何方式提及这个标记的存在。如果这一轮还在提问、探索、反映感受，没有给出具体行动，就不要输出它。
+8. 用用户书写时使用的语言回复（中文、英文，或中英混合都可以）。
+
+9. 程序标记（只写给程序看，不是写给用户看，用户不会读到这一行）：只要这一轮回复里包含了具体的下一步行动建议——不管是通过"试试这个："这个环节给出的、在 🔴/🟠 象限下直接给出的模板/草稿/最小行动，还是第 4 条里认可用户自己提出的方案——就必须在整段回复的最末尾另起一行，一字不改地输出：[[ACTION_READY]]。不要加粗、不要解释、不要用任何方式提及这个标记的存在。如果这一轮还在提问、探索、反映感受，没有给出具体行动，就不要输出它。
 
 记住：这是一段对话，不是问答机——先陪伴、再挖掘、最后才是行动（🔴 和 🟠 象限除外，那两种情况请直接给行动）。`;
 
@@ -2702,6 +2769,133 @@
     return { start, stop, isRecording: () => recording };
   }
 
+  // ---------------------------------------------------------------------
+  // Image attachments — pick, downscale via canvas, and preview an image
+  // before sending it to Claude alongside the typed text. Every image gets
+  // re-encoded to JPEG at two sizes:
+  //   - apiData:   generous enough (1280px/q0.75) for Claude to actually
+  //                read text in a screenshot/form, used only for the one
+  //                outgoing request where the image is first attached.
+  //   - thumbData: a small, heavily-compressed thumbnail (300px/q0.6) used
+  //                for the inline preview, the chat bubble, and — most
+  //                importantly — what actually gets persisted into
+  //                `conversation`/localStorage history from then on, so a
+  //                long-running app with up to 200 saved conversations
+  //                doesn't blow past the localStorage quota.
+  // Re-encoding everything to JPEG also sidesteps HEIC/WEBP support gaps in
+  // Anthropic's API — by the time an image leaves this module it's always
+  // image/jpeg, regardless of what the user actually picked.
+  // ---------------------------------------------------------------------
+
+  const IMAGE_API_MAX_DIMENSION = 1280;
+  const IMAGE_API_QUALITY = 0.75;
+  const IMAGE_THUMB_MAX_DIMENSION = 300;
+  const IMAGE_THUMB_QUALITY = 0.6;
+
+  function resizeImageFile(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("图片读取失败，请再试一次。"));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("图片解析失败——如果是 HEIC 格式，部分浏览器无法读取，可以换成 JPG/PNG 再试。"));
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width >= height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+            else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality).split(",")[1]);
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function createImagePicker({ fileInput, imageBtn, previewRow }) {
+    let images = []; // { apiData, thumbData, mediaType }
+
+    function render() {
+      previewRow.innerHTML = "";
+      images.forEach((img, idx) => {
+        const item = document.createElement("div");
+        item.className = "image-preview-item";
+        const thumb = document.createElement("img");
+        thumb.src = `data:${img.mediaType};base64,${img.thumbData}`;
+        thumb.alt = "";
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "image-preview-remove";
+        removeBtn.title = "移除这张图片";
+        removeBtn.textContent = "✕";
+        removeBtn.addEventListener("click", () => {
+          images.splice(idx, 1);
+          render();
+        });
+        item.appendChild(thumb);
+        item.appendChild(removeBtn);
+        previewRow.appendChild(item);
+      });
+      previewRow.classList.toggle("visible", images.length > 0);
+    }
+
+    imageBtn.addEventListener("click", () => fileInput.click());
+
+    fileInput.addEventListener("change", async () => {
+      const files = Array.from(fileInput.files || []);
+      fileInput.value = ""; // lets the same file be re-picked later
+      for (const file of files) {
+        try {
+          const [apiData, thumbData] = await Promise.all([
+            resizeImageFile(file, IMAGE_API_MAX_DIMENSION, IMAGE_API_QUALITY),
+            resizeImageFile(file, IMAGE_THUMB_MAX_DIMENSION, IMAGE_THUMB_QUALITY),
+          ]);
+          images.push({ apiData, thumbData, mediaType: "image/jpeg" });
+        } catch (err) {
+          showError(err.message || "图片处理失败，请换一张试试。");
+        }
+      }
+      render();
+    });
+
+    return {
+      getImages: () => images.slice(),
+      clear() { images = []; render(); },
+    };
+  }
+
+  // Builds the Anthropic multi-part `content` for a just-picked set of
+  // images plus typed text — full apiData quality, since this is only ever
+  // used for the one outgoing request where these images are attached.
+  function buildMessageContent(text, images) {
+    if (!images.length) return text;
+    const blocks = images.map((img) => ({
+      type: "image",
+      source: { type: "base64", media_type: img.mediaType, data: img.apiData },
+    }));
+    if (text) blocks.push({ type: "text", text });
+    return blocks;
+  }
+
+  // Swaps the high-quality apiData in a just-built content array for the
+  // small thumbData before it's pushed into `conversation` — this is the
+  // representation that gets resent on every future turn and persisted to
+  // localStorage history, so it needs to stay small.
+  function toStoredMessageContent(content, images) {
+    if (!images.length || !Array.isArray(content)) return content;
+    let i = 0;
+    return content.map((block) => {
+      if (block.type !== "image") return block;
+      const img = images[i++];
+      return { type: "image", source: { type: "base64", media_type: img.mediaType, data: img.thumbData } };
+    });
+  }
+
   const taskVoice = createVoiceController({
     micBtn: $("taskMicBtn"),
     statusEl: $("taskMicStatus"),
@@ -2712,6 +2906,18 @@
     micBtn: $("replyMicBtn"),
     statusEl: $("replyMicStatus"),
     textarea: $("replyInput"),
+  });
+
+  const taskImages = createImagePicker({
+    fileInput: $("taskImageInput"),
+    imageBtn: $("taskImageBtn"),
+    previewRow: $("taskImagePreview"),
+  });
+
+  const replyImages = createImagePicker({
+    fileInput: $("replyImageInput"),
+    imageBtn: $("replyImageBtn"),
+    previewRow: $("replyImagePreview"),
   });
 
   document.addEventListener("keydown", (e) => {
@@ -2828,11 +3034,28 @@
     $("emailInlineBox").classList.add("visible");
   }
 
-  function addUserBubble(text) {
+  function addUserBubble(text, images) {
     const thread = $("chatThread");
     const div = document.createElement("div");
     div.className = "bubble bubble-user";
-    div.textContent = text;
+    if (images && images.length) {
+      const imgWrap = document.createElement("div");
+      imgWrap.className = "bubble-images";
+      images.forEach((img) => {
+        const el = document.createElement("img");
+        el.src = `data:${img.mediaType};base64,${img.thumbData}`;
+        el.alt = "";
+        imgWrap.appendChild(el);
+      });
+      div.appendChild(imgWrap);
+      if (text) {
+        const textEl = document.createElement("div");
+        textEl.textContent = text;
+        div.appendChild(textEl);
+      }
+    } else {
+      div.textContent = text;
+    }
     thread.appendChild(div);
     thread.scrollTop = thread.scrollHeight;
   }
@@ -2877,6 +3100,8 @@
     return out.join("\n").trim();
   }
 
+  // Email-specific — this is what powers the "复制到 Outlook" button, so it
+  // deliberately doesn't match 填写内容 (form answers aren't going to Outlook).
   function extractDraftReply(text) {
     return extractSection(text, (h) => /回复草稿|draft reply/i.test(h));
   }
@@ -2926,6 +3151,44 @@
       : "打开了 Outlook，但复制失败，请手动复制草稿。";
   }
 
+  // Appends a small "复制" button next to every paragraph/list item inside
+  // a 回复草稿/填写内容 section (email drafts, filled-in form answers, etc.)
+  // so each piece can be copied on its own, not just the section as a whole.
+  function appendParagraphCopyButton(el) {
+    const originalText = el.textContent; // capture before the button becomes a child
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "para-copy-btn";
+    btn.textContent = "复制";
+    btn.addEventListener("click", async () => {
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(originalText);
+        copied = true;
+      } catch {
+        copied = fallbackCopy(originalText);
+      }
+      btn.disabled = true;
+      btn.textContent = copied ? "已复制✓" : "复制失败";
+      setTimeout(() => { btn.textContent = "复制"; btn.disabled = false; }, 1500);
+    });
+    el.appendChild(document.createTextNode(" "));
+    el.appendChild(btn);
+  }
+
+  function attachParagraphCopyButtons(containerEl) {
+    containerEl.querySelectorAll("h3").forEach((h3) => {
+      if (!/回复草稿|填写内容|draft reply/i.test(h3.textContent)) return;
+      let node = h3.nextElementSibling;
+      while (node && node.tagName !== "H3") {
+        if (node.tagName === "P" || node.tagName === "LI") {
+          appendParagraphCopyButton(node);
+        }
+        node = node.nextElementSibling;
+      }
+    });
+  }
+
   function addAssistantBubble(text, actionReady) {
     maybeOfferEmailInline(text);
 
@@ -2933,6 +3196,7 @@
     const div = document.createElement("div");
     div.className = "bubble bubble-assistant";
     div.innerHTML = renderLite(text);
+    attachParagraphCopyButtons(div);
 
     if (actionReady) {
       // Ambient-sound suggestion, right where the action was just given.
@@ -2986,13 +3250,18 @@
     thread.scrollTop = thread.scrollHeight;
   }
 
-  async function sendConversationTurn() {
+  // `outgoingMessages` lets a caller send higher-quality image data for
+  // this one request (see buildMessageContent/toStoredMessageContent)
+  // without that same high-quality data ending up in `conversation` —
+  // defaults to `conversation` itself for every turn that isn't attaching
+  // a fresh image.
+  async function sendConversationTurn(outgoingMessages) {
     hideError();
     addTypingBubble();
     $("replySendBtn").disabled = true;
     $("submitBtn").disabled = true;
     try {
-      const rawReply = await callClaude(conversation);
+      const rawReply = await callClaude(outgoingMessages || conversation);
       const actionReady = hasActionStep(rawReply);
       const reply = stripActionMarker(rawReply);
       conversation.push({ role: "assistant", content: reply });
@@ -3230,8 +3499,29 @@
     record.messages.forEach((m) => {
       const div = document.createElement("div");
       div.className = m.role === "user" ? "bubble bubble-user" : "bubble bubble-assistant";
-      if (m.role === "user") div.textContent = m.content;
-      else div.innerHTML = renderLite(m.content);
+      if (m.role === "user") {
+        const { text, images } = splitStoredContent(m.content);
+        if (images.length) {
+          const imgWrap = document.createElement("div");
+          imgWrap.className = "bubble-images";
+          images.forEach((img) => {
+            const el = document.createElement("img");
+            el.src = `data:${img.mediaType};base64,${img.thumbData}`;
+            el.alt = "";
+            imgWrap.appendChild(el);
+          });
+          div.appendChild(imgWrap);
+          if (text) {
+            const textEl = document.createElement("div");
+            textEl.textContent = text;
+            div.appendChild(textEl);
+          }
+        } else {
+          div.textContent = text;
+        }
+      } else {
+        div.innerHTML = renderLite(m.content);
+      }
       thread.appendChild(div);
     });
 
@@ -3379,6 +3669,18 @@
     });
   }
 
+  // Inverse of buildMessageContent/toStoredMessageContent — pulls the text
+  // and any (already-thumbnail-sized) images back out of a stored user
+  // message's content so it can be replayed through addUserBubble.
+  function splitStoredContent(content) {
+    if (typeof content === "string") return { text: content, images: [] };
+    const images = content
+      .filter((b) => b.type === "image")
+      .map((b) => ({ mediaType: b.source.media_type, thumbData: b.source.data }));
+    const textBlock = content.find((b) => b.type === "text");
+    return { text: textBlock ? textBlock.text : "", images };
+  }
+
   function resumeSession(record) {
     conversation = record.messages.map((m) => ({ role: m.role, content: m.content }));
     currentSessionId = record.id;
@@ -3397,8 +3699,12 @@
     hideNotice();
 
     conversation.forEach((m) => {
-      if (m.role === "user") addUserBubble(m.content);
-      else addAssistantBubble(m.content, looksLikeActionText(m.content));
+      if (m.role === "user") {
+        const { text, images } = splitStoredContent(m.content);
+        addUserBubble(text, images);
+      } else {
+        addAssistantBubble(m.content, looksLikeActionText(m.content));
+      }
     });
   }
 
@@ -3476,24 +3782,26 @@
   // instead of sending straight to the AI.
   function showQuadrantStep() {
     const task = $("taskInput").value.trim();
-    if (!task) {
-      showError("先写一句你在逃避的事情吧。");
+    if (!task && taskImages.getImages().length === 0) {
+      showError("先写一句你在逃避的事情吧，或者附上一张图片。");
       return;
     }
     hideError();
     pendingTask = task;
-    $("quadrantRecap").textContent = `「${task}」`;
+    $("quadrantRecap").textContent = task ? `「${task}」` : "（已附上图片）";
     $("taskStep").style.display = "none";
     $("quadrantStep").style.display = "block";
   }
 
   // Step 2: quadrant chosen (or skipped) — actually start the conversation.
   function startConversation(task, quadrant) {
-    let content = `我在逃避的事情/感受：\n${task}`;
+    const images = taskImages.getImages();
+    let textContent = task ? `我在逃避的事情/感受：\n${task}` : "我在逃避的事情/感受：（见附图）";
     if (quadrant) {
-      content += `\n\n[优先级象限：${quadrant.zh}]`;
+      textContent += `\n\n[优先级象限：${quadrant.zh}]`;
     }
-    conversation = [{ role: "user", content }];
+    const apiContent = buildMessageContent(textContent, images);
+    conversation = [{ role: "user", content: toStoredMessageContent(apiContent, images) }];
     emailOffered = false;
 
     currentSessionId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -3510,17 +3818,19 @@
     hideNotice();
 
     let displayText = task;
-    if (quadrant) displayText += `\n\n${quadrant.emoji} ${quadrant.zh}`;
-    addUserBubble(displayText);
+    if (quadrant) displayText += (displayText ? "\n\n" : "") + `${quadrant.emoji} ${quadrant.zh}`;
+    addUserBubble(displayText, images);
+    taskImages.clear();
 
-    sendConversationTurn();
+    sendConversationTurn([{ role: "user", content: apiContent }]);
   }
 
   function continueConversation() {
     const text = $("replyInput").value.trim();
     const emailBox = $("emailInlineInput");
     const emailText = emailBox.value.trim();
-    if (!text && !emailText) return;
+    const images = replyImages.getImages();
+    if (!text && !emailText && images.length === 0) return;
 
     let content = text;
     let displayText = text;
@@ -3531,10 +3841,14 @@
       $("emailInlineBox").classList.remove("visible");
     }
 
-    conversation.push({ role: "user", content });
-    addUserBubble(displayText);
+    const apiContent = buildMessageContent(content, images);
+    conversation.push({ role: "user", content: toStoredMessageContent(apiContent, images) });
+    addUserBubble(displayText, images);
+    replyImages.clear();
     $("replyInput").value = "";
-    sendConversationTurn();
+
+    const outgoing = conversation.slice(0, -1).concat([{ role: "user", content: apiContent }]);
+    sendConversationTurn(outgoing);
   }
 
   $("submitBtn").addEventListener("click", showQuadrantStep);
@@ -3634,6 +3948,8 @@
     $("emailInlineBox").classList.remove("visible");
     resetCompletionUI();
     hideError();
+    taskImages.clear();
+    replyImages.clear();
   }
 
   $("startOverBtn").addEventListener("click", () => {
