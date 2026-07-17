@@ -350,6 +350,32 @@
   .chip:hover { background: var(--accent-bg); color: var(--text); border-color: var(--accent-soft); }
   .chip.active { background: rgba(196, 168, 130, 0.25); color: #F0EAE0; border-color: var(--accent); }
 
+  .mode-switch {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .mode-pill {
+    font-family: "Noto Serif SC", serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    padding: 9px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(196, 168, 130, 0.3);
+    background: rgba(240, 234, 224, 0.14);
+    color: rgba(240, 234, 224, 0.75);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .mode-pill:hover:not(.active) { background: rgba(240, 234, 224, 0.24); color: #F0EAE0; }
+  .mode-pill.active {
+    background: rgba(139, 26, 43, 0.85);
+    border-color: rgba(139, 26, 43, 0.9);
+    color: #F5EFE6;
+    font-weight: 600;
+  }
+
   .templates-label {
     font-size: 0.78rem;
     color: var(--text-soft);
@@ -1008,6 +1034,11 @@
         <div class="mic-meta" id="taskMicStatus"></div>
 
         <button class="primary" id="submitBtn" type="button">说吧</button>
+
+        <div class="mode-switch" id="modeSwitch">
+          <button class="mode-pill active" id="modeMicro" type="button">微启动模式</button>
+          <button class="mode-pill" id="modeAccompany" type="button">陪我做完模式</button>
+        </div>
 
         <div class="templates-label">或者，从这里开始</div>
         <div class="templates" id="templateCards"></div>
@@ -3854,6 +3885,14 @@
   $("submitBtn").addEventListener("click", showQuadrantStep);
   $("taskInput").addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") showQuadrantStep();
+  });
+
+  // Visual-only mode pill toggle — no state wired up yet.
+  $("modeSwitch").addEventListener("click", (e) => {
+    const btn = e.target.closest(".mode-pill");
+    if (!btn) return;
+    $("modeSwitch").querySelectorAll(".mode-pill").forEach((el) => el.classList.remove("active"));
+    btn.classList.add("active");
   });
 
   document.querySelectorAll(".quadrant-cell").forEach((cell) => {
