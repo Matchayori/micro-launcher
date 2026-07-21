@@ -3452,6 +3452,50 @@
     localStorage.setItem(STORAGE_KEYS.companionSessions, JSON.stringify(list.slice(0, HISTORY_LIMIT)));
   }
 
+  const BREADCRUMB_SYSTEM_PROMPT = `你是一个任务拆解引擎。用户会用一两句话描述他们卡住的一件事。你的唯一任务是把这件事拆解成一串可以立刻动手执行的具体步骤，返回 JSON。
+
+输出格式（严格遵守）：
+- 只输出一个 JSON 数组，不要有任何其他内容。
+- 第一个字符必须是 [ ，最后一个字符必须是 ] 。
+- 不要使用 \`\`\`json 或 \`\`\` 这样的代码块围栏。
+- 不要在数组前后加任何说明文字、标题或客套话。
+- 数组里每一项的结构必须是：{"title": string, "estimatedMinutes": number}
+  - title：一个具体、可立刻执行的动作（动词+对象），不是笼统的阶段名。
+  - estimatedMinutes：完成这一步大致需要的分钟数（纯数字，不要写"大约"这类文字）。
+
+步骤颗粒度：整体上，步骤大致会落在这三类动作里——
+1. 进入/打开做这件事需要的环境（阻力最低的第一步）
+2. 吸收/回顾已有的信息（读、看、听，不是处理或回复）
+3. 产出第一个具体、可见的成果（不是"完成任务"这种笼统说法）
+
+例子（改论文场景）：
+[{"title":"打开论文页面","estimatedMinutes":1},{"title":"读完原论文","estimatedMinutes":8},{"title":"改第一页的批注","estimatedMinutes":5}]
+
+例子（回邮件场景）：
+[{"title":"打开邮箱","estimatedMinutes":1},{"title":"重读对方的邮件","estimatedMinutes":2},{"title":"写第一句回复","estimatedMinutes":3}]
+
+重要：上面两个例子只是步骤类型的参考框架，不代表步数固定为 3。步骤总数请按任务的复杂程度在 3 到 6 之间浮动——越复杂、涉及的环节越多，同一类型内也可以拆成不止一个步骤（比如任务涉及两份材料，就可以拆成两个"吸收信息"步骤）。不要不管任务大小都固定输出同样的步数。`;
+
+  function parseBreadcrumbSteps(raw) {
+    try {
+      let text = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+      const start = text.indexOf("[");
+      const end = text.lastIndexOf("]");
+      if (start === -1 || end === -1 || end < start) return null;
+      const parsed = JSON.parse(text.slice(start, end + 1));
+      if (!Array.isArray(parsed) || parsed.length === 0) return null;
+      const steps = parsed
+        .filter((s) => s && typeof s.title === "string" && s.title.trim())
+        .map((s) => ({
+          title: s.title.trim(),
+          estimatedMinutes: typeof s.estimatedMinutes === "number" ? s.estimatedMinutes : null,
+        }));
+      return steps.length ? steps.slice(0, 6) : null;
+    } catch {
+      return null;
+    }
+  }
+
   const Companion = (() => {
     let session = null; // the taskSession object, or null when idle
     let pomodoroActive = false; // mirrors Breathing's `active`
@@ -3481,6 +3525,21 @@
 
     function setBreadcrumb(steps) {
       if (session) session.breadcrumb = steps;
+    }
+
+    async function generateBreadcrumb() {
+      if (!session) return;
+      $("submitBtn").disabled = true;
+      let raw = null;
+      try {
+        raw = await callClaude([{ role: "user", content: session.input }], BREADCRUMB_SYSTEM_PROMPT);
+      } catch (err) {
+        showError(err.message || String(err));
+      }
+      const steps = raw != null ? parseBreadcrumbSteps(raw) : null;
+      setBreadcrumb(steps || [{ title: session.input, estimatedMinutes: null }]);
+      persist();
+      $("submitBtn").disabled = false;
     }
 
     function advanceStep() {
@@ -3546,6 +3605,7 @@
       getSession,
       isActive,
       setBreadcrumb,
+      generateBreadcrumb,
       advanceStep,
       updateStepStatus,
       startPomodoro,
@@ -4016,8 +4076,12 @@
   }
 
   function handleSubmitClick() {
-    if (activeMode === "companion") Companion.start($("taskInput").value.trim());
-    else showQuadrantStep();
+    if (activeMode === "companion") {
+      Companion.start($("taskInput").value.trim());
+      Companion.generateBreadcrumb();
+    } else {
+      showQuadrantStep();
+    }
   }
 
   $("submitBtn").addEventListener("click", handleSubmitClick);
