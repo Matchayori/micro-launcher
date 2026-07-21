@@ -1272,6 +1272,7 @@
     micLang: "microLauncher_micLang",
     completions: "microLauncher_completions",
     history: "microLauncher_history",
+    companionSessions: "microLauncher_companionSessions",
     dynamicBg: "microLauncher_dynamicBg",
     reminders: "microLauncher_reminders",
   };
@@ -3031,6 +3032,7 @@
   let conversation = []; // { role: "user" | "assistant", content: string }
   let emailOffered = false; // whether the email-paste box has been revealed this conversation
   let pendingTask = ""; // task text captured before the quadrant step
+  let activeMode = "microstart"; // "microstart" | "companion" — driven by #modeSwitch
 
   // The system prompt asks Claude to append this exact, invisible-to-the-
   // user marker whenever a turn gives a concrete next step / micro-action.
@@ -3427,6 +3429,135 @@
     else history.unshift(record);
     saveHistoryList(history);
   }
+
+  // ---------------------------------------------------------------------
+  // Companion — "陪我做完模式" task session: a hidden AI-generated step
+  // path (breadcrumb) plus a pomodoro log, persisted separately from the
+  // microstart chat history since it isn't transcript-shaped. `activeMode`
+  // (declared above) is the sole mode axis — session presence here already
+  // implies companion mode, so the session object itself carries no `mode`
+  // field.
+  // ---------------------------------------------------------------------
+
+  function loadCompanionSessions() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEYS.companionSessions));
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveCompanionSessionList(list) {
+    localStorage.setItem(STORAGE_KEYS.companionSessions, JSON.stringify(list.slice(0, HISTORY_LIMIT)));
+  }
+
+  const Companion = (() => {
+    let session = null; // the taskSession object, or null when idle
+    let pomodoroActive = false; // mirrors Breathing's `active`
+    let pomodoroGeneration = 0; // mirrors Breathing's `generation`
+
+    function start(input) {
+      session = {
+        id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        completed: false,
+        input,
+        breadcrumb: [],
+        currentStepIndex: 0,
+        pomodoroLog: [],
+      };
+      return session;
+    }
+
+    function getSession() {
+      return session;
+    }
+
+    function isActive() {
+      return !!session;
+    }
+
+    function setBreadcrumb(steps) {
+      if (session) session.breadcrumb = steps;
+    }
+
+    function advanceStep() {
+      if (session) session.currentStepIndex++;
+    }
+
+    function updateStepStatus(index, status) {
+      if (session && session.breadcrumb[index]) session.breadcrumb[index].status = status;
+    }
+
+    function startPomodoro() {
+      if (!session) return;
+      pomodoroActive = true;
+      pomodoroGeneration++;
+      session.pomodoroLog.push({ stepIndex: session.currentStepIndex, startedAt: new Date().toISOString(), checkins: [] });
+    }
+
+    function checkin(note) {
+      if (!session) return;
+      const log = session.pomodoroLog[session.pomodoroLog.length - 1];
+      if (log) log.checkins.push({ at: new Date().toISOString(), note });
+    }
+
+    function stopPomodoro() {
+      pomodoroActive = false;
+      pomodoroGeneration++;
+    }
+
+    function isPomodoroActive() {
+      return pomodoroActive;
+    }
+
+    function persist() {
+      if (!session) return;
+      session.updatedAt = new Date().toISOString();
+      const list = loadCompanionSessions();
+      const idx = list.findIndex((r) => r.id === session.id);
+      if (idx >= 0) list[idx] = session;
+      else list.unshift(session);
+      saveCompanionSessionList(list);
+    }
+
+    function finish(completed) {
+      if (!session) return;
+      session.completed = completed;
+      persist();
+    }
+
+    function reset() {
+      pomodoroActive = false;
+      pomodoroGeneration++;
+      session = null;
+    }
+
+    function resume(record) {
+      pomodoroActive = false;
+      pomodoroGeneration++;
+      session = record;
+    }
+
+    return {
+      start,
+      getSession,
+      isActive,
+      setBreadcrumb,
+      advanceStep,
+      updateStepStatus,
+      startPomodoro,
+      checkin,
+      stopPomodoro,
+      isPomodoroActive,
+      persist,
+      finish,
+      reset,
+      resume,
+    };
+  })();
 
   function startOfWeek(date) {
     const d = new Date(date);
@@ -3884,17 +4015,22 @@
     sendConversationTurn(outgoing);
   }
 
-  $("submitBtn").addEventListener("click", showQuadrantStep);
+  function handleSubmitClick() {
+    if (activeMode === "companion") Companion.start($("taskInput").value.trim());
+    else showQuadrantStep();
+  }
+
+  $("submitBtn").addEventListener("click", handleSubmitClick);
   $("taskInput").addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") showQuadrantStep();
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleSubmitClick();
   });
 
-  // Visual-only mode pill toggle — no state wired up yet.
   $("modeSwitch").addEventListener("click", (e) => {
     const btn = e.target.closest(".mode-pill");
     if (!btn) return;
     $("modeSwitch").querySelectorAll(".mode-pill").forEach((el) => el.classList.remove("active"));
     btn.classList.add("active");
+    activeMode = btn.id === "modeAccompany" ? "companion" : "microstart";
   });
 
   document.querySelectorAll(".quadrant-cell").forEach((cell) => {
@@ -3994,8 +4130,13 @@
   }
 
   $("startOverBtn").addEventListener("click", () => {
-    if (currentSessionId) saveCurrentSession(currentSessionCompleted);
-    resetToHome();
+    if (Companion.isActive()) {
+      Companion.finish(false);
+      Companion.reset();
+    } else {
+      if (currentSessionId) saveCurrentSession(currentSessionCompleted);
+      resetToHome();
+    }
     $("taskInput").focus();
   });
 
