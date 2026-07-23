@@ -3810,7 +3810,7 @@
       hideCheckinBubble();
     }
 
-    function startPomodoro() {
+    function startPomodoro(startingSeconds) {
       if (!session) return;
       pomodoroActive = true;
       pomodoroGeneration++;
@@ -3820,8 +3820,11 @@
       ambientStartedByPomodoro = !Ambient.getState().isPlaying;
       if (ambientStartedByPomodoro) Ambient.play();
 
-      pomodoroEndsAt = Date.now() + POMODORO_MINUTES * 60000;
-      updateCountdownDisplay(POMODORO_MINUTES * 60);
+      const seconds = typeof startingSeconds === "number" && startingSeconds > 0
+        ? startingSeconds
+        : POMODORO_MINUTES * 60;
+      pomodoroEndsAt = Date.now() + seconds * 1000;
+      updateCountdownDisplay(seconds);
       pomodoroIntervalId = setInterval(() => {
         const remaining = Math.max(0, Math.round((pomodoroEndsAt - Date.now()) / 1000));
         updateCountdownDisplay(remaining);
@@ -3847,6 +3850,11 @@
     function stopPomodoro() {
       pomodoroActive = false;
       pomodoroGeneration++;
+      if (session && session.pomodoroLog.length) {
+        const lastEntry = session.pomodoroLog[session.pomodoroLog.length - 1];
+        lastEntry.endedAt = new Date().toISOString();
+        lastEntry.remainingSeconds = Math.max(0, Math.round((pomodoroEndsAt - Date.now()) / 1000));
+      }
       cleanupPomodoroTimers();
     }
 
@@ -4482,9 +4490,12 @@
   });
 
   $("companionContinueBtn").addEventListener("click", () => {
+    const session = Companion.getSession();
+    const lastEntry = session && session.pomodoroLog[session.pomodoroLog.length - 1];
+    const startingSeconds = lastEntry && lastEntry.remainingSeconds > 0 ? lastEntry.remainingSeconds : undefined;
     $("companionPomodoroChoice").style.display = "none";
     $("pomodoroScreen").style.display = "block";
-    Companion.startPomodoro();
+    Companion.startPomodoro(startingSeconds);
   });
 
   $("companionRestBtn").addEventListener("click", () => {
