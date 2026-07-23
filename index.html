@@ -1240,6 +1240,20 @@
       <div id="companionDoneScreen" style="display:none;">
         <div class="companion-step-card">
           <div class="companion-step-title">这件事，你陪自己做完了。</div>
+
+          <div class="hint" style="margin-bottom:8px;">这件事做起来，跟你预期的比：</div>
+          <div class="presets" id="reflectionDifficulty" style="justify-content:center; margin-bottom:14px;">
+            <button type="button" class="chip" data-difficulty="harder">比想的难</button>
+            <button type="button" class="chip" data-difficulty="same">差不多</button>
+            <button type="button" class="chip" data-difficulty="easier">比想的容易</button>
+          </div>
+
+          <textarea id="reflectionNote" rows="2" placeholder="现在感觉怎么样？（选填）"></textarea>
+
+          <div class="feedback-actions">
+            <button class="secondary" id="reflectionSkipBtn" type="button">跳过</button>
+            <button class="primary" id="reflectionDoneBtn" type="button">完成</button>
+          </div>
         </div>
       </div>
     </div>
@@ -3696,12 +3710,17 @@
         currentStepIndex: 0,
         pomodoroLog: [],
         breadcrumbSource: null, // "ai" | "manual" — set once the user picks a path
+        reflection: null, // {difficulty, note} — set once the user answers/skips the post-completion reflection
       };
       return session;
     }
 
     function getSession() {
       return session;
+    }
+
+    function setReflection(reflection) {
+      if (session) session.reflection = reflection;
     }
 
     function isActive() {
@@ -3920,6 +3939,10 @@
     function finish(completed) {
       if (!session) return;
       session.completed = completed;
+      if (completed) {
+        bumpCompletionCount();
+        renderStreak();
+      }
       persist();
     }
 
@@ -3944,6 +3967,7 @@
       getSession,
       isActive,
       setBreadcrumb,
+      setReflection,
       generateBreadcrumb,
       advanceStep,
       updateStepStatus,
@@ -4449,8 +4473,37 @@
   function showCompanionDone() {
     $("companionPomodoroChoice").style.display = "none";
     $("companionStep").style.display = "none";
+    $("reflectionDifficulty").querySelectorAll(".chip").forEach((chip) => chip.classList.remove("active"));
+    $("reflectionNote").value = "";
     $("companionDoneScreen").style.display = "block";
   }
+
+  function exitCompanionDone(reflection) {
+    Companion.setReflection(reflection);
+    Companion.persist();
+    Companion.reset();
+    $("companionDoneScreen").style.display = "none";
+    $("taskStep").style.display = "block";
+  }
+
+  $("reflectionDifficulty").addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    const alreadyActive = chip.classList.contains("active");
+    $("reflectionDifficulty").querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+    if (!alreadyActive) chip.classList.add("active");
+  });
+
+  $("reflectionSkipBtn").addEventListener("click", () => exitCompanionDone(null));
+
+  $("reflectionDoneBtn").addEventListener("click", () => {
+    const activeChip = $("reflectionDifficulty").querySelector(".chip.active");
+    const reflection = {
+      difficulty: activeChip ? activeChip.dataset.difficulty : null,
+      note: $("reflectionNote").value.trim() || null,
+    };
+    exitCompanionDone(reflection.difficulty || reflection.note ? reflection : null);
+  });
 
   Companion.onPomodoroEnd(showPomodoroEndPlaceholder);
 
