@@ -1212,6 +1212,36 @@
           <button class="secondary" id="pomodoroEndBtn" type="button">结束这一步</button>
         </div>
       </div>
+
+      <!-- Companion pomodoro end — three-way choice, shown after the
+           countdown finishes naturally or "结束这一步" is clicked early. -->
+      <div id="companionPomodoroChoice" style="display:none;">
+        <div class="companion-step-card">
+          <div class="companion-step-title">这一步进行得怎么样？</div>
+          <div class="completion-buttons">
+            <button class="primary" id="companionDoneStepBtn" type="button">我做到了 ✓</button>
+            <button class="secondary" id="companionContinueBtn" type="button">还没做完，继续</button>
+            <button class="secondary" id="companionRestBtn" type="button">先休息一下</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Companion rest screen — a short break, not another work pomodoro. -->
+      <div id="companionRestScreen" style="display:none;">
+        <div class="companion-step-card">
+          <div class="companion-step-title">先休息一下</div>
+          <div class="pomodoro-time" id="restTimeDisplay">05:00</div>
+          <button class="secondary" id="restEndBtn" type="button">结束休息</button>
+        </div>
+      </div>
+
+      <!-- Companion done screen — shown once the last breadcrumb step is
+           marked complete. -->
+      <div id="companionDoneScreen" style="display:none;">
+        <div class="companion-step-card">
+          <div class="companion-step-title">这件事，你陪自己做完了。</div>
+        </div>
+      </div>
     </div>
 
     <!-- Chat area: shown once a conversation has started -->
@@ -3640,6 +3670,7 @@
     const CHECKIN_MIN_MINUTES = 12;
     const CHECKIN_MAX_MINUTES = 13;
     const CHECKIN_AUTO_DISMISS_MS = 5000;
+    const REST_MINUTES = 5;
 
     let session = null; // the taskSession object, or null when idle
     let pomodoroActive = false; // mirrors Breathing's `active`
@@ -3650,6 +3681,9 @@
     let checkinDismissTimeoutId = null; // auto-hides a shown check-in bubble after CHECKIN_AUTO_DISMISS_MS
     let ambientStartedByPomodoro = false; // only stop ambient sound on exit if this pomodoro is the one that started it
     let onPomodoroEndCallback = null;
+    let restEndsAt = null; // same end-timestamp pattern as pomodoroEndsAt, for the short rest countdown
+    let restIntervalId = null;
+    let onRestEndCallback = null;
 
     function start(input) {
       session = {
@@ -3824,6 +3858,47 @@
       onPomodoroEndCallback = fn;
     }
 
+    function updateRestCountdownDisplay(remainingSeconds) {
+      const el = $("restTimeDisplay");
+      if (el) el.textContent = formatMMSS(remainingSeconds);
+    }
+
+    function cleanupRestTimer() {
+      if (restIntervalId) {
+        clearInterval(restIntervalId);
+        restIntervalId = null;
+      }
+    }
+
+    // A short break — deliberately not another work pomodoro: no ambient
+    // sound changes, no pomodoroLog entry, no check-in bubble. Same
+    // end-timestamp + setInterval-tick pattern as startPomodoro() so the
+    // countdown stays accurate under tab throttling.
+    function startRest() {
+      cleanupRestTimer();
+      restEndsAt = Date.now() + REST_MINUTES * 60000;
+      updateRestCountdownDisplay(REST_MINUTES * 60);
+      restIntervalId = setInterval(() => {
+        const remaining = Math.max(0, Math.round((restEndsAt - Date.now()) / 1000));
+        updateRestCountdownDisplay(remaining);
+        if (remaining <= 0) {
+          cleanupRestTimer();
+          if (onRestEndCallback) onRestEndCallback();
+        }
+      }, 1000);
+    }
+
+    function onRestEnd(fn) {
+      onRestEndCallback = fn;
+    }
+
+    // Manual early exit from rest — same shape as stopPomodoro(): clear the
+    // interval, no end-of-rest callback fires (the caller goes straight to
+    // renderCompanionStep() itself instead).
+    function stopRest() {
+      cleanupRestTimer();
+    }
+
     function persist() {
       if (!session) return;
       session.updatedAt = new Date().toISOString();
@@ -3844,6 +3919,7 @@
       pomodoroActive = false;
       pomodoroGeneration++;
       cleanupPomodoroTimers();
+      cleanupRestTimer();
       session = null;
     }
 
@@ -3851,6 +3927,7 @@
       pomodoroActive = false;
       pomodoroGeneration++;
       cleanupPomodoroTimers();
+      cleanupRestTimer();
       session = record;
     }
 
@@ -3867,6 +3944,9 @@
       stopPomodoro,
       isPomodoroActive,
       onPomodoroEnd,
+      startRest,
+      onRestEnd,
+      stopRest,
       persist,
       finish,
       reset,
@@ -4351,16 +4431,25 @@
     renderCompanionStep();
   }
 
-  // Placeholder hand-off for both pomodoro exit paths (natural countdown
-  // completion and manual early exit) — the real three-way end-of-pomodoro
-  // choice is a later step.
+  // Hand-off for both pomodoro exit paths (natural countdown completion and
+  // manual early exit) — shows the three-way choice.
   function showPomodoroEndPlaceholder() {
-    console.log("[companion] pomodoro ended", Companion.getSession());
     $("pomodoroScreen").style.display = "none";
-    $("companionStep").style.display = "block";
+    $("companionPomodoroChoice").style.display = "block";
+  }
+
+  function showCompanionDone() {
+    $("companionPomodoroChoice").style.display = "none";
+    $("companionStep").style.display = "none";
+    $("companionDoneScreen").style.display = "block";
   }
 
   Companion.onPomodoroEnd(showPomodoroEndPlaceholder);
+
+  Companion.onRestEnd(() => {
+    $("companionRestScreen").style.display = "none";
+    renderCompanionStep();
+  });
 
   $("companionStepStartBtn").addEventListener("click", () => {
     $("companionStep").style.display = "none";
@@ -4371,6 +4460,37 @@
   $("pomodoroEndBtn").addEventListener("click", () => {
     Companion.stopPomodoro();
     showPomodoroEndPlaceholder();
+  });
+
+  $("restEndBtn").addEventListener("click", () => {
+    Companion.stopRest();
+    $("companionRestScreen").style.display = "none";
+    renderCompanionStep();
+  });
+
+  $("companionDoneStepBtn").addEventListener("click", () => {
+    const session = Companion.getSession();
+    if (!session) return;
+    Companion.advanceStep();
+    $("companionPomodoroChoice").style.display = "none";
+    if (session.currentStepIndex >= session.breadcrumb.length) {
+      Companion.finish(true);
+      showCompanionDone();
+    } else {
+      renderCompanionStep();
+    }
+  });
+
+  $("companionContinueBtn").addEventListener("click", () => {
+    $("companionPomodoroChoice").style.display = "none";
+    $("pomodoroScreen").style.display = "block";
+    Companion.startPomodoro();
+  });
+
+  $("companionRestBtn").addEventListener("click", () => {
+    $("companionPomodoroChoice").style.display = "none";
+    $("companionRestScreen").style.display = "block";
+    Companion.startRest();
   });
 
   $("companionChoiceAiBtn").addEventListener("click", async () => {
