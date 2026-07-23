@@ -378,6 +378,21 @@
     font-weight: 600;
   }
 
+  .companion-step-card {
+    background: rgba(240, 234, 224, 0.14);
+    border: 1px solid rgba(240, 234, 224, 0.2);
+    border-radius: var(--radius);
+    padding: 28px 22px;
+    text-align: center;
+  }
+  .companion-step-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #F0EAE0;
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+
   .templates-label {
     font-size: 0.78rem;
     color: var(--text-soft);
@@ -1072,6 +1087,15 @@
           </button>
         </div>
         <div class="toggle-row" id="quadrantSkip" style="justify-content:center;">跳过，直接聊</div>
+      </div>
+
+      <!-- Companion mode — shows only the current hidden breadcrumb step,
+           never the total count or progress, on purpose. -->
+      <div id="companionStep" style="display:none;">
+        <div class="companion-step-card">
+          <div class="companion-step-title" id="companionStepTitle"></div>
+          <button class="primary" id="companionStepStartBtn" type="button">开始这一步</button>
+        </div>
       </div>
     </div>
 
@@ -3528,18 +3552,24 @@
     }
 
     async function generateBreadcrumb() {
-      if (!session) return;
+      if (!session) return false;
       $("submitBtn").disabled = true;
       let raw = null;
+      let apiOk = true;
       try {
         raw = await callClaude([{ role: "user", content: session.input }], BREADCRUMB_SYSTEM_PROMPT);
       } catch (err) {
+        apiOk = false;
         showError(err.message || String(err));
       }
       const steps = raw != null ? parseBreadcrumbSteps(raw) : null;
       setBreadcrumb(steps || [{ title: session.input, estimatedMinutes: null }]);
       persist();
       $("submitBtn").disabled = false;
+      // false only when the API call itself failed (showError already shown
+      // above) — a malformed/garbage reply still falls back to a usable
+      // single-step breadcrumb and should still render the step card.
+      return apiOk;
     }
 
     function advanceStep() {
@@ -4017,6 +4047,24 @@
     $("quadrantStep").style.display = "block";
   }
 
+  // Companion mode — replaces the input area with a card showing only the
+  // current breadcrumb step (never the total count or a progress bar, by
+  // design: this is meant to feel like a chain of single links, not a
+  // visible checklist).
+  function renderCompanionStep() {
+    const session = Companion.getSession();
+    if (!session) return;
+    const step = session.breadcrumb[session.currentStepIndex];
+    if (!step) return;
+    $("taskStep").style.display = "none";
+    $("companionStepTitle").textContent = step.title;
+    $("companionStep").style.display = "block";
+  }
+
+  $("companionStepStartBtn").addEventListener("click", () => {
+    console.log("[companion] start step clicked", Companion.getSession());
+  });
+
   // Step 2: quadrant chosen (or skipped) — actually start the conversation.
   function startConversation(task, quadrant) {
     const images = taskImages.getImages();
@@ -4075,10 +4123,11 @@
     sendConversationTurn(outgoing);
   }
 
-  function handleSubmitClick() {
+  async function handleSubmitClick() {
     if (activeMode === "companion") {
       Companion.start($("taskInput").value.trim());
-      Companion.generateBreadcrumb();
+      const ok = await Companion.generateBreadcrumb();
+      if (ok) renderCompanionStep();
     } else {
       showQuadrantStep();
     }
