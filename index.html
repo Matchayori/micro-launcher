@@ -416,6 +416,57 @@
     margin-bottom: 8px;
   }
 
+  .companion-choice-row {
+    display: flex;
+    gap: 10px;
+  }
+  .companion-choice-row button { flex: 1; margin-top: 0; }
+
+  .companion-manual-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+    text-align: left;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .companion-manual-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: rgba(240, 234, 224, 0.1);
+    border: 1px solid rgba(240, 234, 224, 0.18);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 0.88rem;
+    color: #F0EAE0;
+  }
+  .companion-manual-list-remove {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--warn-text);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .companion-manual-input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .companion-manual-input-row input { margin: 0; }
+  .companion-manual-input-row button { flex: 0 0 auto; width: auto; margin-top: 0; padding: 0 18px; }
+
   .templates-label {
     font-size: 0.78rem;
     color: var(--text-soft);
@@ -1110,6 +1161,32 @@
           </button>
         </div>
         <div class="toggle-row" id="quadrantSkip" style="justify-content:center;">跳过，直接聊</div>
+      </div>
+
+      <!-- Companion mode — AI-decompose vs manual-decompose choice, asked
+           right after submit, before either breadcrumb path runs. -->
+      <div id="companionPathChoice" style="display:none;">
+        <div class="companion-step-card">
+          <div class="companion-step-title">AI帮我拆，还是你自己想拆几步？</div>
+          <div class="companion-choice-row">
+            <button class="primary" id="companionChoiceAiBtn" type="button">AI 帮我拆</button>
+            <button class="secondary" id="companionChoiceManualBtn" type="button">我自己拆</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Companion manual breadcrumb entry — a running list exists only
+           here, during input; once "结束部署" hands off to companionStep /
+           the pomodoro screen, only the current single step ever shows. -->
+      <div id="companionManualEntry" style="display:none;">
+        <div class="companion-step-card">
+          <div class="companion-manual-list" id="companionManualList"></div>
+          <div class="companion-manual-input-row">
+            <input type="text" id="companionManualInput" placeholder="这一步具体做什么？">
+            <button class="secondary" id="companionManualNextBtn" type="button">下一步</button>
+          </div>
+          <button class="primary" id="companionManualDoneBtn" type="button">结束部署</button>
+        </div>
       </div>
 
       <!-- Companion mode — shows only the current hidden breadcrumb step,
@@ -3584,6 +3661,7 @@
         breadcrumb: [],
         currentStepIndex: 0,
         pomodoroLog: [],
+        breadcrumbSource: null, // "ai" | "manual" — set once the user picks a path
       };
       return session;
     }
@@ -4208,6 +4286,71 @@
     $("companionStep").style.display = "block";
   }
 
+  // AI-decompose vs manual-decompose choice, shown right after submit,
+  // before either breadcrumb path runs.
+  function showCompanionPathChoice() {
+    $("taskStep").style.display = "none";
+    $("companionPathChoice").style.display = "block";
+  }
+
+  // Manual breadcrumb entry — a running list exists only on this screen,
+  // during input. Once "结束部署" hands off to companionStep / the pomodoro
+  // screen, only the current single step ever shows (renderCompanionStep
+  // itself is untouched and knows nothing about this list).
+  let manualSteps = [];
+
+  function renderManualList() {
+    const container = $("companionManualList");
+    container.innerHTML = "";
+    manualSteps.forEach((step, index) => {
+      const row = document.createElement("div");
+      row.className = "companion-manual-list-item";
+      const text = document.createElement("span");
+      text.textContent = `${index + 1}. ${step.title}`;
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "companion-manual-list-remove";
+      removeBtn.textContent = "✕";
+      removeBtn.addEventListener("click", () => {
+        manualSteps.splice(index, 1);
+        renderManualList();
+      });
+      row.appendChild(text);
+      row.appendChild(removeBtn);
+      container.appendChild(row);
+    });
+  }
+
+  function showCompanionManualEntry() {
+    manualSteps = [];
+    renderManualList();
+    $("companionManualInput").value = "";
+    $("companionPathChoice").style.display = "none";
+    $("companionManualEntry").style.display = "block";
+    $("companionManualInput").focus();
+  }
+
+  function addManualStep() {
+    const input = $("companionManualInput");
+    const text = input.value.trim();
+    if (!text) return;
+    manualSteps.push({ title: text, estimatedMinutes: null });
+    input.value = "";
+    renderManualList();
+    input.focus();
+  }
+
+  function finishManualEntry() {
+    if (manualSteps.length === 0) {
+      showError("至少写一步吧，哪怕很小的一步也可以。");
+      return;
+    }
+    Companion.setBreadcrumb(manualSteps);
+    Companion.persist();
+    $("companionManualEntry").style.display = "none";
+    renderCompanionStep();
+  }
+
   // Placeholder hand-off for both pomodoro exit paths (natural countdown
   // completion and manual early exit) — the real three-way end-of-pomodoro
   // choice is a later step.
@@ -4229,6 +4372,26 @@
     Companion.stopPomodoro();
     showPomodoroEndPlaceholder();
   });
+
+  $("companionChoiceAiBtn").addEventListener("click", async () => {
+    const session = Companion.getSession();
+    if (session) session.breadcrumbSource = "ai";
+    $("companionPathChoice").style.display = "none";
+    const ok = await Companion.generateBreadcrumb();
+    if (ok) renderCompanionStep();
+  });
+
+  $("companionChoiceManualBtn").addEventListener("click", () => {
+    const session = Companion.getSession();
+    if (session) session.breadcrumbSource = "manual";
+    showCompanionManualEntry();
+  });
+
+  $("companionManualNextBtn").addEventListener("click", addManualStep);
+  $("companionManualInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") addManualStep();
+  });
+  $("companionManualDoneBtn").addEventListener("click", finishManualEntry);
 
   // Step 2: quadrant chosen (or skipped) — actually start the conversation.
   function startConversation(task, quadrant) {
@@ -4288,11 +4451,10 @@
     sendConversationTurn(outgoing);
   }
 
-  async function handleSubmitClick() {
+  function handleSubmitClick() {
     if (activeMode === "companion") {
       Companion.start($("taskInput").value.trim());
-      const ok = await Companion.generateBreadcrumb();
-      if (ok) renderCompanionStep();
+      showCompanionPathChoice();
     } else {
       showQuadrantStep();
     }
