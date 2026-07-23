@@ -393,6 +393,29 @@
     margin-bottom: 20px;
   }
 
+  .pomodoro-time {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-variant-numeric: tabular-nums;
+    font-size: 3rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: #F0EAE0;
+    margin-bottom: 20px;
+  }
+  .pomodoro-checkin {
+    background: rgba(240, 234, 224, 0.1);
+    border: 1px solid rgba(240, 234, 224, 0.18);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    text-align: left;
+  }
+  .pomodoro-checkin-prompt {
+    font-size: 0.85rem;
+    color: var(--text-soft);
+    margin-bottom: 8px;
+  }
+
   .templates-label {
     font-size: 0.78rem;
     color: var(--text-soft);
@@ -1095,6 +1118,21 @@
         <div class="companion-step-card">
           <div class="companion-step-title" id="companionStepTitle"></div>
           <button class="primary" id="companionStepStartBtn" type="button">开始这一步</button>
+        </div>
+      </div>
+
+      <!-- Companion pomodoro screen — 25:00 countdown while the current
+           step is in progress. -->
+      <div id="pomodoroScreen" style="display:none;">
+        <div class="companion-step-card">
+          <div class="pomodoro-time" id="pomodoroTimeDisplay">25:00</div>
+
+          <div class="pomodoro-checkin" id="pomodoroCheckin" style="display:none;">
+            <div class="pomodoro-checkin-prompt">进展怎么样？</div>
+            <input type="text" class="pomodoro-checkin-input" id="pomodoroCheckinInput" placeholder="随手写两句，或者不用管它">
+          </div>
+
+          <button class="secondary" id="pomodoroEndBtn" type="button">结束这一步</button>
         </div>
       </div>
     </div>
@@ -3521,9 +3559,20 @@
   }
 
   const Companion = (() => {
+    const POMODORO_MINUTES = 25;
+    const CHECKIN_MIN_MINUTES = 12;
+    const CHECKIN_MAX_MINUTES = 13;
+    const CHECKIN_AUTO_DISMISS_MS = 5000;
+
     let session = null; // the taskSession object, or null when idle
     let pomodoroActive = false; // mirrors Breathing's `active`
     let pomodoroGeneration = 0; // mirrors Breathing's `generation`
+    let pomodoroEndsAt = null; // end timestamp — remaining time is always recomputed from this, never decremented
+    let pomodoroIntervalId = null; // the 1s countdown-tick interval
+    let checkinTimeoutId = null; // one-shot "轻声问候" scheduling timeout
+    let checkinDismissTimeoutId = null; // auto-hides a shown check-in bubble after CHECKIN_AUTO_DISMISS_MS
+    let ambientStartedByPomodoro = false; // only stop ambient sound on exit if this pomodoro is the one that started it
+    let onPomodoroEndCallback = null;
 
     function start(input) {
       session = {
@@ -3580,11 +3629,101 @@
       if (session && session.breadcrumb[index]) session.breadcrumb[index].status = status;
     }
 
+    function formatMMSS(totalSeconds) {
+      const m = Math.floor(totalSeconds / 60);
+      const s = totalSeconds % 60;
+      return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+
+    function updateCountdownDisplay(remainingSeconds) {
+      const el = $("pomodoroTimeDisplay");
+      if (el) el.textContent = formatMMSS(remainingSeconds);
+    }
+
+    function handleCheckinInputTyped() {
+      if (checkinDismissTimeoutId) {
+        clearTimeout(checkinDismissTimeoutId);
+        checkinDismissTimeoutId = null;
+      }
+    }
+
+    function handleCheckinKeydown(e) {
+      if (e.key !== "Enter") return;
+      const input = $("pomodoroCheckinInput");
+      const note = input ? input.value.trim() : "";
+      if (note) checkin(note);
+      hideCheckinBubble();
+    }
+
+    function showCheckinBubble() {
+      const bubble = $("pomodoroCheckin");
+      const input = $("pomodoroCheckinInput");
+      if (!bubble || !input) return;
+      input.value = "";
+      bubble.style.display = "block";
+      input.addEventListener("input", handleCheckinInputTyped);
+      input.addEventListener("keydown", handleCheckinKeydown);
+      checkinDismissTimeoutId = setTimeout(hideCheckinBubble, CHECKIN_AUTO_DISMISS_MS);
+    }
+
+    function hideCheckinBubble() {
+      const bubble = $("pomodoroCheckin");
+      const input = $("pomodoroCheckinInput");
+      if (checkinDismissTimeoutId) {
+        clearTimeout(checkinDismissTimeoutId);
+        checkinDismissTimeoutId = null;
+      }
+      if (bubble) bubble.style.display = "none";
+      if (input) {
+        input.removeEventListener("input", handleCheckinInputTyped);
+        input.removeEventListener("keydown", handleCheckinKeydown);
+      }
+    }
+
+    // Clears both pomodoro timers and stops ambient sound if this pomodoro
+    // is the one that started it. Called from every exit path (manual stop,
+    // natural completion, reset, resume) so none of them can forget a piece
+    // of cleanup the others remember.
+    function cleanupPomodoroTimers() {
+      if (pomodoroIntervalId) {
+        clearInterval(pomodoroIntervalId);
+        pomodoroIntervalId = null;
+      }
+      if (checkinTimeoutId) {
+        clearTimeout(checkinTimeoutId);
+        checkinTimeoutId = null;
+      }
+      if (ambientStartedByPomodoro) Ambient.stop();
+      ambientStartedByPomodoro = false;
+      hideCheckinBubble();
+    }
+
     function startPomodoro() {
       if (!session) return;
       pomodoroActive = true;
       pomodoroGeneration++;
+      const myGeneration = pomodoroGeneration;
       session.pomodoroLog.push({ stepIndex: session.currentStepIndex, startedAt: new Date().toISOString(), checkins: [] });
+
+      ambientStartedByPomodoro = !Ambient.getState().isPlaying;
+      if (ambientStartedByPomodoro) Ambient.play();
+
+      pomodoroEndsAt = Date.now() + POMODORO_MINUTES * 60000;
+      updateCountdownDisplay(POMODORO_MINUTES * 60);
+      pomodoroIntervalId = setInterval(() => {
+        const remaining = Math.max(0, Math.round((pomodoroEndsAt - Date.now()) / 1000));
+        updateCountdownDisplay(remaining);
+        if (remaining <= 0) {
+          stopPomodoro();
+          if (onPomodoroEndCallback) onPomodoroEndCallback();
+        }
+      }, 1000);
+
+      const checkinDelayMs = (CHECKIN_MIN_MINUTES + Math.random() * (CHECKIN_MAX_MINUTES - CHECKIN_MIN_MINUTES)) * 60000;
+      checkinTimeoutId = setTimeout(() => {
+        if (!pomodoroActive || myGeneration !== pomodoroGeneration) return;
+        showCheckinBubble();
+      }, checkinDelayMs);
     }
 
     function checkin(note) {
@@ -3596,10 +3735,15 @@
     function stopPomodoro() {
       pomodoroActive = false;
       pomodoroGeneration++;
+      cleanupPomodoroTimers();
     }
 
     function isPomodoroActive() {
       return pomodoroActive;
+    }
+
+    function onPomodoroEnd(fn) {
+      onPomodoroEndCallback = fn;
     }
 
     function persist() {
@@ -3621,12 +3765,14 @@
     function reset() {
       pomodoroActive = false;
       pomodoroGeneration++;
+      cleanupPomodoroTimers();
       session = null;
     }
 
     function resume(record) {
       pomodoroActive = false;
       pomodoroGeneration++;
+      cleanupPomodoroTimers();
       session = record;
     }
 
@@ -3642,6 +3788,7 @@
       checkin,
       stopPomodoro,
       isPomodoroActive,
+      onPomodoroEnd,
       persist,
       finish,
       reset,
@@ -4061,8 +4208,26 @@
     $("companionStep").style.display = "block";
   }
 
+  // Placeholder hand-off for both pomodoro exit paths (natural countdown
+  // completion and manual early exit) — the real three-way end-of-pomodoro
+  // choice is a later step.
+  function showPomodoroEndPlaceholder() {
+    console.log("[companion] pomodoro ended", Companion.getSession());
+    $("pomodoroScreen").style.display = "none";
+    $("companionStep").style.display = "block";
+  }
+
+  Companion.onPomodoroEnd(showPomodoroEndPlaceholder);
+
   $("companionStepStartBtn").addEventListener("click", () => {
-    console.log("[companion] start step clicked", Companion.getSession());
+    $("companionStep").style.display = "none";
+    $("pomodoroScreen").style.display = "block";
+    Companion.startPomodoro();
+  });
+
+  $("pomodoroEndBtn").addEventListener("click", () => {
+    Companion.stopPomodoro();
+    showPomodoroEndPlaceholder();
   });
 
   // Step 2: quadrant chosen (or skipped) — actually start the conversation.
