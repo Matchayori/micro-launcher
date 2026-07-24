@@ -1953,7 +1953,7 @@
       }
 
       vec3 sunDirection() {
-        vec3 dir = normalize(vec3(-0.45, 0.14, 1));
+        vec3 dir = normalize(vec3(-0.52, 0.14, 1));
         return dir;
       }
 
@@ -1987,7 +1987,7 @@
         if (sunw <= 0.0) return vec3(0.0);
         vec2 sunP = vec2(dot(sunDir, uu), dot(sunDir, vv)) / sunw * 2.5;
         float d2 = dot(pScreen - sunP, pScreen - sunP);
-        float pseudoCos = clamp(1.0 - d2/12.5, 0.0, 1.0);
+        float pseudoCos = clamp(1.0 - d2/8.0, 0.0, 1.0);
         vec3 glow = vec3(0.0);
         glow += 0.5*sunCol1*pow(pseudoCos, 30.0);
         glow += 4.0*sunCol2*pow(pseudoCos, 300.0);
