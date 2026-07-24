@@ -2256,9 +2256,12 @@
       return buffer;
     }
 
-    function playChime(c, startAt) {
-      // A little ascending bell flourish — C5 E5 G5 C6 E6.
-      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+    function playChime(c, startAt, intensity) {
+      // A little ascending bell flourish — C5 E5 G5 C6 E6. At lower
+      // intensity, play only the first N notes rather than all five.
+      const allNotes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+      const noteCount = Math.max(1, Math.round(allNotes.length * intensity));
+      const notes = allNotes.slice(0, noteCount);
       notes.forEach((freq, i) => {
         const t = startAt + i * 0.09;
         const osc = c.createOscillator();
@@ -2284,18 +2287,22 @@
       });
     }
 
-    function playApplause(c, startAt, duration) {
+    function playApplause(c, startAt, duration, intensity) {
       // A brief crowd-clap swell: many short bandpass-filtered noise bursts,
       // randomly timed, under one gain envelope that rises then tapers.
+      // Intensity scales both how many claps there are and how loud the
+      // envelope peaks — quieter and sparser at low intensity, not just
+      // shorter (a shortened clip would sound like a cutoff, not "smaller").
+      const peakGain = 0.5 * intensity;
       const master = c.createGain();
       master.gain.value = 0;
       master.connect(c.destination);
       master.gain.setValueAtTime(0, startAt);
-      master.gain.linearRampToValueAtTime(0.5, startAt + duration * 0.25);
-      master.gain.linearRampToValueAtTime(0.35, startAt + duration * 0.6);
+      master.gain.linearRampToValueAtTime(peakGain, startAt + duration * 0.25);
+      master.gain.linearRampToValueAtTime(peakGain * 0.7, startAt + duration * 0.6);
       master.gain.linearRampToValueAtTime(0, startAt + duration);
 
-      const clapCount = 70;
+      const clapCount = Math.max(8, Math.round(70 * intensity));
       for (let i = 0; i < clapCount; i++) {
         const t = startAt + Math.random() * duration;
         const src = c.createBufferSource();
@@ -2315,11 +2322,11 @@
       }
     }
 
-    function play() {
+    function play(intensity = 1) {
       const c = SharedAudio.ensureCtx();
       const now = c.currentTime + 0.02;
-      playChime(c, now);
-      playApplause(c, now + 0.15, 1.6);
+      playChime(c, now, intensity);
+      playApplause(c, now + 0.15, 1.6, intensity);
     }
 
     return { play };
@@ -2327,12 +2334,11 @@
 
   const CONFETTI_COLORS = ["#6b9080", "#a4c3b2", "#e8b86d", "#e0a389", "#8fb9a5"];
 
-  function launchConfetti() {
+  function launchConfetti(pieceCount = 28) {
     const layer = document.createElement("div");
     layer.className = "confetti-layer";
     document.body.appendChild(layer);
 
-    const pieceCount = 28;
     for (let i = 0; i < pieceCount; i++) {
       const piece = document.createElement("div");
       piece.className = "confetti-piece";
@@ -4534,6 +4540,15 @@
     if (!session) return;
     Companion.advanceStep();
     $("companionPomodoroChoice").style.display = "none";
+
+    // Celebrate every step, scaling up to exactly microstart's full
+    // intensity on the last one — ratio-based, not absolute step count, so
+    // a 3-step and a 6-step breadcrumb both reach ratio 1 on their own
+    // final step. Floored so step 1 is never silent/invisible.
+    const ratio = Math.min(1, session.currentStepIndex / session.breadcrumb.length);
+    try { Celebration.play(ratio); } catch { /* decorative — never block completion on this */ }
+    try { launchConfetti(Math.max(2, Math.round(28 * ratio))); } catch { /* decorative — never block completion on this */ }
+
     if (session.currentStepIndex >= session.breadcrumb.length) {
       Companion.finish(true);
       showCompanionDone();
