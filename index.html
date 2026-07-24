@@ -946,7 +946,16 @@
     gap: 8px;
     margin-bottom: 4px;
   }
+  .history-item-top-left { display: flex; align-items: center; gap: 6px; }
   .history-item-date { font-size: 0.74rem; color: var(--text-soft); }
+  .history-item-mode-tag {
+    font-size: 0.68rem;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    white-space: nowrap;
+  }
   .history-item-status { font-size: 0.8rem; }
   .history-item-preview {
     font-size: 0.88rem;
@@ -3641,6 +3650,22 @@
     localStorage.setItem(STORAGE_KEYS.companionSessions, JSON.stringify(list.slice(0, HISTORY_LIMIT)));
   }
 
+  // Merges both storage keys into one time-sorted array for the history
+  // drawer's display only — `__source` is added to copies here, never
+  // persisted back to either storage key.
+  function loadMergedHistoryRecords() {
+    const microstart = loadHistory().map((r) => ({ ...r, __source: "microstart" }));
+    const companion = loadCompanionSessions().map((r) => ({ ...r, __source: "companion" }));
+    return [...microstart, ...companion].sort(
+      (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
+    );
+  }
+
+  function deleteCompanionHistoryItem(id) {
+    saveCompanionSessionList(loadCompanionSessions().filter((r) => r.id !== id));
+    renderHistoryList();
+  }
+
   const BREADCRUMB_SYSTEM_PROMPT = `你是一个任务拆解引擎。用户会用一两句话描述他们卡住的一件事。你的唯一任务是把这件事拆解成一串可以立刻动手执行的具体步骤，返回 JSON。
 
 输出格式（严格遵守）：
@@ -4147,39 +4172,99 @@
     $("historyDetail").classList.add("open");
   }
 
+  const REFLECTION_DIFFICULTY_LABELS = { harder: "比想的难", same: "差不多", easier: "比想的容易" };
+
+  // Read-only recap for a companion session — not a variant of
+  // openHistoryDetail, since companion records have no messages/feedback/
+  // quadrant. Reuses the same #historyDetail container and the existing
+  // .bubble-user/.history-feedback classes rather than inventing new ones.
+  function openCompanionHistoryDetail(record) {
+    const thread = $("historyDetailThread");
+    thread.innerHTML = "";
+
+    const inputDiv = document.createElement("div");
+    inputDiv.className = "bubble bubble-user";
+    inputDiv.textContent = record.input;
+    thread.appendChild(inputDiv);
+
+    const stepCount = record.breadcrumb ? record.breadcrumb.length : 0;
+    const summaryDiv = document.createElement("div");
+    summaryDiv.className = "bubble bubble-assistant";
+    summaryDiv.textContent = stepCount === 0
+      ? "还没有拆解出具体步骤"
+      : record.completed
+        ? `共 ${stepCount} 步，全部完成`
+        : `共 ${stepCount} 步，走到第 ${Math.min(record.currentStepIndex + 1, stepCount)} 步`;
+    thread.appendChild(summaryDiv);
+
+    if (record.reflection) {
+      const lines = [];
+      if (record.reflection.difficulty) {
+        lines.push(`跟预期比：${REFLECTION_DIFFICULTY_LABELS[record.reflection.difficulty] || record.reflection.difficulty}`);
+      }
+      if (record.reflection.note) lines.push(`📝 ${record.reflection.note}`);
+      if (lines.length) {
+        const div = document.createElement("div");
+        div.className = "history-feedback";
+        div.innerHTML = lines.map((l) => escapeHtml(l)).join("<br>");
+        thread.appendChild(div);
+      }
+    }
+
+    $("historyDetailMeta").textContent = [
+      formatHistoryDate(record.startedAt),
+      "陪我做完",
+      record.completed ? "✅ 完成" : "⏸ 未完成",
+    ].filter(Boolean).join(" · ");
+    $("historyList").style.display = "none";
+    $("historyStats").style.display = "none";
+    $("historyDetail").classList.add("open");
+  }
+
   function renderHistoryList() {
-    const history = loadHistory();
-    renderHistoryStats(history);
+    const merged = loadMergedHistoryRecords();
+    renderHistoryStats(loadHistory());
 
     const list = $("historyList");
     list.innerHTML = "";
 
-    if (!history.length) {
+    if (!merged.length) {
       list.innerHTML = `<div class="history-empty">还没有对话记录。</div>`;
       return;
     }
 
-    history.forEach((record) => {
+    merged.forEach((record) => {
+      const isCompanion = record.__source === "companion";
       const item = document.createElement("div");
       item.className = "history-item";
-      const preview = `${record.quadrant ? record.quadrant.emoji + " " : ""}${record.task}`;
+      const preview = isCompanion
+        ? record.input
+        : `${record.quadrant ? record.quadrant.emoji + " " : ""}${record.task}`;
+      const modeTag = isCompanion ? `<span class="history-item-mode-tag">陪我做完</span>` : "";
       item.innerHTML = `
         <div class="history-item-top">
-          <span class="history-item-date">${escapeHtml(formatHistoryDate(record.startedAt))}</span>
+          <div class="history-item-top-left">
+            <span class="history-item-date">${escapeHtml(formatHistoryDate(record.startedAt))}</span>
+            ${modeTag}
+          </div>
           <span class="history-item-status">${record.completed ? "✅" : "⏸"}</span>
         </div>
         <div class="history-item-preview">${escapeHtml(preview)}</div>
         <button type="button" class="history-item-delete" title="删除">🗑</button>
       `;
+      const deleteFn = isCompanion
+        ? () => deleteCompanionHistoryItem(record.id)
+        : () => deleteHistoryItem(record.id);
       item.addEventListener("click", (e) => {
         if (e.target.closest(".history-item-delete")) return;
-        openHistoryDetail(record);
+        if (isCompanion) openCompanionHistoryDetail(record);
+        else openHistoryDetail(record);
       });
       item.querySelector(".history-item-delete").addEventListener("click", (e) => {
         e.stopPropagation();
-        deleteHistoryItem(record.id);
+        deleteFn();
       });
-      attachSwipeToDelete(item, () => deleteHistoryItem(record.id));
+      attachSwipeToDelete(item, deleteFn);
       list.appendChild(item);
     });
   }
